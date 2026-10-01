@@ -27,7 +27,10 @@ export type Context = {
   readonly cwd: string
   readonly start: TurnStart
   readonly childUpdates: boolean
-  /** A background consumer follows open children after the parent turn ends; it never writes `session/update`. */
+  /**
+   * A background consumer follows open children after the parent turn ends; it never forwards their updates as
+   * `session/update`.
+   */
   readonly mode: "turn" | "background"
 }
 
@@ -94,6 +97,8 @@ export type Output =
       readonly event: PermissionEvent
       readonly tool?: Tool
       readonly child?: ChildSession
+      /** Whether the asking tool call reached the client, as a `session/update` or a child update. */
+      readonly toolCallSent: boolean
     }
   | {
       readonly _tag: "FormAsk"
@@ -158,7 +163,8 @@ export function step(state: TurnState, event: EventSubscribeOutput, ctx: Context
     const tool = event.data.source?.id
       ? state.tools.get(toolKey(event.data.sessionID, event.data.source.id))
       : undefined
-    return { state, outputs: [{ _tag: "PermissionAsk", event, tool, child }] }
+    const toolCallSent = tool !== undefined && (ctx.mode === "turn" || ctx.childUpdates)
+    return { state, outputs: [{ _tag: "PermissionAsk", event, tool, child, toolCallSent }] }
   }
   if (event.type === "form.created" && (event.data.form.sessionID === ctx.sessionID || child)) {
     return {
@@ -599,8 +605,16 @@ function compactionUpdate(marker: CompactionMarker): SessionUpdate {
 
 function projectChildUpdate(update: SessionUpdate, child: ChildSession) {
   const projected = { ...update }
-  projected._meta = {
-    ...projected._meta,
+  projected._meta = { ...projected._meta, ...childSessionMeta(child) }
+  if (projected.sessionUpdate === "tool_call" || projected.sessionUpdate === "tool_call_update") {
+    projected.toolCallId = `${child.id}:${projected.toolCallId}`
+    if (projected.title && child.title) projected.title = `${child.title}: ${projected.title}`
+  }
+  return projected
+}
+
+export function childSessionMeta(child: ChildSession) {
+  return {
     "opencode/child-session": {
       id: child.id,
       parentID: child.parentID,
@@ -608,11 +622,6 @@ function projectChildUpdate(update: SessionUpdate, child: ChildSession) {
       ...(child.title ? { title: child.title } : {}),
     },
   }
-  if (projected.sessionUpdate === "tool_call" || projected.sessionUpdate === "tool_call_update") {
-    projected.toolCallId = `${child.id}:${projected.toolCallId}`
-    if (projected.title && child.title) projected.title = `${child.title}: ${projected.title}`
-  }
-  return projected
 }
 
 function matchesStart(event: EventSubscribeOutput, start: TurnStart) {

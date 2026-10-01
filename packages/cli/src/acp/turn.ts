@@ -142,7 +142,8 @@ export const make = Effect.fnUntraced(function* (input: {
         clientSessionID: ctx.sessionID,
         cwd: ctx.cwd,
         tool: ask.tool,
-        ...(ask.child ? { toolCallPrefix: ask.child.id, titlePrefix: ask.child.title } : {}),
+        child: ask.child,
+        toolCallSent: ask.toolCallSent,
       },
       Deferred.await(subscription.cancelled),
     )
