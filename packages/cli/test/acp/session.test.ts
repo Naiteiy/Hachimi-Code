@@ -205,6 +205,36 @@ describe("acp session lifecycle over the wire", () => {
     ).toMatchObject({ code: -32602, data: { sessionId: "ses_loaded" } })
   })
 
+  test("detaches sessions whose new or resume fails after attaching", async () => {
+    // A model without a name loads, then fails building config options once the session is attached.
+    await using acp = await startWire({
+      fetch: (request) =>
+        request.path === "/api/model"
+          ? Response.json({
+              location: { directory: "/workspace", project: { id: "global", directory: "/workspace" } },
+              data: [testModel, { ...secondModel, name: null }],
+            })
+          : undefined,
+    })
+    acp.server.sessions.set("ses_resumed", makeSession("ses_resumed"))
+    await acp.initialize()
+
+    expect(await rpcError(acp.newSession())).toMatchObject({ code: -32603 })
+    expect(
+      await rpcError(acp.request("session/resume", { cwd: "/workspace", sessionId: "ses_resumed", mcpServers: [] })),
+    ).toMatchObject({ code: -32603 })
+    const failed = [...acp.server.sessions.keys()]
+
+    expect(failed).toHaveLength(2)
+    expect(
+      await Promise.all(
+        failed.map((sessionId) =>
+          rpcError(acp.request("session/set_config_option", { sessionId, configId: "mode", value: "plan" })),
+        ),
+      ),
+    ).toMatchObject(failed.map((sessionId) => ({ code: -32602, data: { sessionId } })))
+  })
+
   test("lists server-backed pages for the requested cwd", async () => {
     await using acp = await startWire()
     Array.from({ length: 101 }, (_, index) =>
