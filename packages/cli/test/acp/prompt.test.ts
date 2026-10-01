@@ -166,6 +166,20 @@ describe("acp prompt turns over the wire", () => {
     ])
   })
 
+  test("rejects an image with neither data nor uri as invalid params", async () => {
+    await using acp = await startSession()
+
+    expect(
+      await rpcError(
+        acp.prompt(acp.sessionId, [
+          { type: "text", text: "look" },
+          { type: "image", data: "", mimeType: "image/png" },
+        ]),
+      ),
+    ).toMatchObject({ code: -32602, message: expect.stringContaining("image content has no data or uri") })
+    expect(acp.server.submissions).toEqual([])
+  })
+
   test("returns turn usage and publishes current context usage with cumulative session cost", async () => {
     const assistantTokens = { input: 100, output: 40, reasoning: 7, cache: { read: 11, write: 13 } }
     await using acp = await startSession({
