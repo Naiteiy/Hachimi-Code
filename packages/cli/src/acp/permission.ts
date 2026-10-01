@@ -14,7 +14,7 @@ import { ACPTranslate } from "./translate"
 import { absolutePath, filePath, patchHunks, pendingToolCall, stringValue, toLocations, type ToolInput } from "./tool"
 
 type PermissionEvent = Extract<EventSubscribeOutput, { type: "permission.asked" }>
-type Tool = { readonly name: string; readonly input: ToolInput }
+type Tool = { readonly id: string; readonly name: string; readonly input: ToolInput }
 
 type Input = {
   readonly client: OpenCodeClient
@@ -25,8 +25,8 @@ type Input = {
   readonly cwd: string
   readonly tool?: Tool
   readonly child?: ACPTranslate.ChildSession
-  /** Whether the client already knows the asking tool call; otherwise the ask announces one first. */
-  readonly toolCallSent: boolean
+  /** The client never received the asking tool call, so the ask announces one under the permission's ID. */
+  readonly announce: boolean
 }
 
 const options: PermissionOption[] = [
@@ -53,20 +53,20 @@ export const reply = Effect.fn("cli.acp.permission.reply")(function* (input: Inp
 
 const ask = Effect.fnUntraced(function* (input: Input) {
   const toolCall = yield* permissionToolCall(input)
-  if (input.toolCallSent) return yield* select(input, toolCall)
-  const update = (update: SessionUpdate) =>
-    input.connection.sessionUpdate({ sessionId: input.clientSessionID, update }).pipe(Effect.ignoreCause)
-  // The ask's tool call exists only for the client, so it settles with the decision.
-  yield* update({ sessionUpdate: "tool_call", ...toolCall })
-  return yield* select(input, toolCall).pipe(
-    Effect.onExit((exit) =>
+  if (!input.announce) return yield* select(input, toolCall)
+  const update = (next: SessionUpdate) =>
+    input.connection.sessionUpdate({ sessionId: input.clientSessionID, update: next }).pipe(Effect.ignoreCause)
+  // The ask's tool call exists only for the client, so once announced it settles with the decision.
+  return yield* Effect.acquireUseRelease(
+    update({ sessionUpdate: "tool_call", ...toolCall }),
+    () => select(input, toolCall),
+    (_, exit) =>
       update({
         sessionUpdate: "tool_call_update",
         toolCallId: toolCall.toolCallId,
         status: Exit.isSuccess(exit) && exit.value !== "reject" ? "completed" : "failed",
-        ...(toolCall._meta ? { _meta: toolCall._meta } : {}),
+        _meta: toolCall._meta,
       }),
-    ),
   )
 })
 
@@ -79,19 +79,23 @@ const select = Effect.fnUntraced(function* (input: Input, toolCall: ToolCall) {
 const permissionToolCall = Effect.fnUntraced(function* (input: Input) {
   const toolName = input.tool?.name ?? input.event.data.action
   const toolInput = input.tool?.input ?? input.event.data.metadata ?? {}
-  const previews = yield* permissionPreviews(toolName, toolInput, input.cwd)
-  const toolCallID = input.event.data.source?.id ?? input.event.data.id
+  const previews = yield* permissionPreviews(toolName, toolInput, input.cwd).pipe(
+    Effect.orElseSucceed((): ToolCallContent[] => []),
+  )
+  const toolCallID = input.tool && !input.announce ? input.tool.id : input.event.data.id
+  const toolCall = pendingToolCall({
+    toolCallId: input.child ? `${input.child.id}:${toolCallID}` : toolCallID,
+    toolName,
+    state: {
+      input: toolInput,
+      title: prefixedTitle(input.child?.title, permissionTitle(toolName, toolInput, previews)),
+    },
+    cwd: input.cwd,
+  })
   return {
-    ...pendingToolCall({
-      toolCallId: input.child ? `${input.child.id}:${toolCallID}` : toolCallID,
-      toolName,
-      state: {
-        input: toolInput,
-        title: prefixedTitle(input.child?.title, permissionTitle(toolName, toolInput, previews)),
-      },
-      cwd: input.cwd,
-    }),
-    locations: permissionLocations(toolName, toolInput, input.event.data, input.cwd),
+    ...toolCall,
+    rawInput: input.tool ? toolCall.rawInput : undefined,
+    locations: permissionLocations(toolName, toolInput, input.event.data.action, input.event.data.resources, input.cwd),
     ...(previews.length > 0 ? { content: previews } : {}),
     ...(input.child ? { _meta: ACPTranslate.childSessionMeta(input.child) } : {}),
   }
@@ -118,15 +122,14 @@ const permissionPreviews = Effect.fnUntraced(function* (toolName: string, input:
   if (tool === "write") {
     const content = stringValue(input.content)
     if (content === undefined) return []
-    const oldText = yield* readText(path).pipe(Effect.orElseSucceed(() => null))
-    return [diff(path, oldText, content)]
+    return [diff(path, yield* readText(path), content)]
   }
   if (tool !== "edit") return []
   const oldString = stringValue(input.oldString)
   const newString = stringValue(input.newString)
   if (oldString === undefined || newString === undefined) return []
-  const oldText = yield* readText(path).pipe(Effect.orElseSucceed(() => undefined))
-  if (oldText === undefined) return []
+  const oldText = yield* readText(path)
+  if (oldText === null) return []
   const newText =
     input.replaceAll === true ? oldText.replaceAll(oldString, newString) : oldText.replace(oldString, newString)
   return [diff(path, oldText, newText)]
@@ -144,13 +147,13 @@ function patchPreviews(input: ToolInput, cwd: string) {
           const newText = hunk.contents.endsWith("\n") || hunk.contents === "" ? hunk.contents : `${hunk.contents}\n`
           return diff(path, null, newText)
         }
-        const oldText = yield* readText(path)
+        const oldText = yield* Effect.fromNullishOr(yield* readText(path))
         if (hunk.type === "delete") return diff(path, oldText, "")
         const derived = yield* Effect.try(() => Patch.derive(hunk.path, hunk.chunks, oldText))
         return diff(hunk.movePath ? absolutePath(hunk.movePath, cwd) : path, oldText, derived.content)
       }),
     { concurrency: "unbounded" },
-  ).pipe(Effect.orElseSucceed((): ToolCallContent[] => []))
+  )
 }
 
 function diff(path: string, oldText: string | null, newText: string): ToolCallContent {
@@ -181,15 +184,17 @@ function permissionTitle(toolName: string, input: ToolInput, previews: ReadonlyA
 }
 
 // Only these actions ask with path resources; an external directory asks for `<dir>/*`, located at the directory.
+// Core's wildcard matching treats only `*` and `?` as special.
 function permissionLocations(
   toolName: string,
   input: ToolInput,
-  event: PermissionEvent["data"],
+  action: string,
+  resources: ReadonlyArray<string>,
   cwd: string,
 ): ToolCallLocation[] {
   const locations = toLocations(toolName, input, cwd)
-  if (locations.length > 0 || !PathActions.has(event.action)) return locations
-  const paths = event.resources.flatMap((resource) => {
+  if (locations.length > 0 || !PathActions.has(action)) return locations
+  const paths = resources.flatMap((resource) => {
     const path = resource.endsWith("/*") ? resource.slice(0, -2) : resource
     return path && !/[*?]/.test(path) ? [absolutePath(path, cwd)] : []
   })
@@ -198,8 +203,14 @@ function permissionLocations(
 
 const PathActions = new Set(["read", "edit", "external_directory"])
 
+// Only a missing file reads as new (`null`); any other read error fails, so the ask gets no preview for it.
 function readText(path: string) {
-  return Effect.tryPromise(() => Bun.file(path).text())
+  return Effect.tryPromise({ try: () => Bun.file(path).text(), catch: (error) => error }).pipe(
+    Effect.catchIf(
+      (error) => error instanceof Error && "code" in error && error.code === "ENOENT",
+      () => Effect.succeed(null),
+    ),
+  )
 }
 
 export * as ACPPermission from "./permission"

@@ -16,6 +16,7 @@ import {
   succeeded,
   textDelta,
   toolCalled,
+  toolFailed,
   toolStarted,
   toolSucceeded,
   turn,
@@ -31,6 +32,10 @@ describe("acp permissions over the wire", () => {
         turn(
           sessionID,
           id,
+          toolStarted(sessionID, "call_once", "shell"),
+          toolCalled(sessionID, "call_once", { command: "printf hello" }),
+          toolStarted(sessionID, "call_always", "read"),
+          toolCalled(sessionID, "call_always", { path: "/workspace/file.ts" }),
           permissionAsked(sessionID, "perm_once", {
             action: "shell",
             metadata: { command: "printf hello" },
@@ -101,8 +106,8 @@ describe("acp permissions over the wire", () => {
     expect(acp.permissions[0]?.toolCall).toMatchObject({
       title: "/tmp/outside",
       locations: [{ path: "/tmp/outside/a.ts" }],
-      rawInput: { filepath: "/tmp/outside/a.ts", parentDir: "/tmp/outside" },
     })
+    expect(acp.permissions[0]?.toolCall).not.toHaveProperty("rawInput")
   })
 
   test("locates path resources without glob patterns when the ask has no tool locations", async () => {
@@ -116,7 +121,10 @@ describe("acp permissions over the wire", () => {
             resources: ["/tmp/outside/*", "/tmp/other/*", "/tmp/outside/*"],
             metadata: {},
           }),
-          permissionAsked(sessionID, "perm_read", { action: "read", resources: ["src/[slug].ts", "**/*.ts"] }),
+          permissionAsked(sessionID, "perm_read", {
+            action: "read",
+            resources: ["src/[slug].ts", "src/{a,b}.ts", "**/*.ts", "src/?.ts"],
+          }),
           permissionAsked(sessionID, "perm_search", { action: "websearch", resources: ["acp spec"] }),
         ),
       permission: allowOnce,
@@ -126,7 +134,7 @@ describe("acp permissions over the wire", () => {
 
     expect(acp.permissions.map((request) => request.toolCall.locations)).toEqual([
       [{ path: "/tmp/outside" }, { path: "/tmp/other" }],
-      [{ path: "/workspace/src/[slug].ts" }],
+      [{ path: "/workspace/src/[slug].ts" }, { path: "/workspace/src/{a,b}.ts" }],
       [],
     ])
   })
@@ -134,15 +142,7 @@ describe("acp permissions over the wire", () => {
   test("announces an ask without a known tool call before requesting it and settles it with the decision", async () => {
     await using acp = await startSession({
       onPrompt: ({ sessionID, id }) =>
-        turn(
-          sessionID,
-          id,
-          permissionAsked(sessionID, "perm_allowed"),
-          permissionAsked(sessionID, "perm_rejected"),
-          permissionAsked(sessionID, "perm_unseen", {
-            source: { type: "tool", messageID: "msg_unseen", id: "call_unseen" },
-          }),
-        ),
+        turn(sessionID, id, permissionAsked(sessionID, "perm_allowed"), permissionAsked(sessionID, "perm_rejected")),
       permission: (request) => ({
         outcome: { outcome: "selected", optionId: request.toolCall.toolCallId === "perm_rejected" ? "reject" : "once" },
       }),
@@ -159,17 +159,52 @@ describe("acp permissions over the wire", () => {
         kind: "execute",
         status: "pending",
         locations: [{ path: "/workspace" }],
-        rawInput: { command: "printf hello", cwd: "/workspace" },
       },
     })
-    expect(toolCallTrail(acp, "perm_allowed")).toEqual(["tool_call:pending", "request", "tool_call_update:completed"])
-    expect(toolCallTrail(acp, "perm_rejected")).toEqual(["tool_call:pending", "request", "tool_call_update:failed"])
-    expect(toolCallTrail(acp, "call_unseen")).toEqual(["tool_call:pending", "request", "tool_call_update:completed"])
+    expect(toolCallTrail(acp, "perm_allowed")).toEqual([
+      "tool_call:pending",
+      "request",
+      "tool_call_update:completed",
+      "response",
+    ])
+    expect(toolCallTrail(acp, "perm_rejected")).toEqual([
+      "tool_call:pending",
+      "request",
+      "tool_call_update:failed",
+      "response",
+    ])
     expect(decisions(acp)).toEqual([
       ["perm_allowed", "once"],
       ["perm_rejected", "reject"],
-      ["perm_unseen", "once"],
     ])
+  })
+
+  test("announces an ask under its own ID when the client never received its tool call", async () => {
+    await using acp = await startSession({
+      onPrompt: ({ sessionID, id }) => [
+        toolStarted(sessionID, "call_early", "shell"),
+        toolCalled(sessionID, "call_early", { command: "printf hello" }),
+        delivered(sessionID, id),
+        permissionAsked(sessionID, "perm_early", {
+          source: { type: "tool", messageID: "msg_tools", id: "call_early" },
+        }),
+      ],
+      onPermissionReply: ({ sessionID }) => [
+        toolFailed(sessionID, "call_early", { error: { type: "unknown", message: "exit 1" } }),
+        succeeded(sessionID),
+      ],
+      permission: allowOnce,
+    })
+
+    await acp.prompt(acp.sessionId, "hello")
+
+    expect(toolCallTrail(acp, "perm_early")).toEqual([
+      "tool_call:pending",
+      "request",
+      "tool_call_update:completed",
+      "response",
+    ])
+    expect(toolCallTrail(acp, "call_early")).toEqual(["tool_call_update:failed", "response"])
   })
 
   test("asks about a streamed tool call with its own input and without announcing it again", async () => {
@@ -198,7 +233,12 @@ describe("acp permissions over the wire", () => {
     )
     expect(running).toEqual([{ path: "/workspace/file.ts" }])
     expect(acp.permissions[0]?.toolCall.rawInput).toEqual(running[0])
-    expect(toolCallTrail(acp, "call_read")).toEqual(["tool_call:pending", "tool_call_update:in_progress", "request"])
+    expect(toolCallTrail(acp, "call_read")).toEqual([
+      "tool_call:pending",
+      "tool_call_update:in_progress",
+      "request",
+      "response",
+    ])
   })
 
   test("routes foreground child permissions through the parent ACP session", async () => {
@@ -237,8 +277,68 @@ describe("acp permissions over the wire", () => {
       "tool_call:pending",
       "tool_call_update:in_progress",
       "request",
+      "response",
     ])
     expect(acp.server.replies).toEqual([{ sessionID: "ses_child", requestID: "perm_child", decision: "once" }])
+  })
+
+  test("asks about a child tool call the client received as a child update without announcing it", async () => {
+    await using acp = await startSession({
+      capabilities: { childSessionUpdates: true },
+      onPrompt: ({ sessionID, id }) =>
+        turn(
+          sessionID,
+          id,
+          childCreated("ses_child", sessionID, "Review code"),
+          toolStarted("ses_child", "call_child", "read"),
+          permissionAsked("ses_child", "perm_child", {
+            action: "read",
+            source: { type: "tool", messageID: "msg_child", id: "call_child" },
+          }),
+          succeeded("ses_child"),
+        ),
+      permission: allowOnce,
+    })
+
+    await acp.prompt(acp.sessionId, "hello")
+
+    expect(acp.childUpdates.flatMap((item) => (item.type === "update" ? [item.update.toolCallId] : []))).toEqual([
+      "ses_child:call_child",
+    ])
+    expect(acp.permissions.map((request) => request.toolCall.toolCallId)).toEqual(["ses_child:call_child"])
+    expect(acp.updates.filter((item) => item.update.sessionUpdate.startsWith("tool_call"))).toEqual([])
+  })
+
+  test("asks about a child's streamed tool call after the parent turn ends without announcing it again", async () => {
+    await using acp = await startSession({
+      onPrompt: ({ sessionID, id }) =>
+        turn(
+          sessionID,
+          id,
+          childCreated("ses_background", sessionID, "Research"),
+          durableEvent("session.execution.started", { sessionID: "ses_background" }),
+          toolStarted("ses_background", "call_read", "read"),
+          toolCalled("ses_background", "call_read", { path: "/workspace/notes.md" }),
+        ),
+      permission: allowOnce,
+    })
+
+    expect((await acp.prompt(acp.sessionId, "hello")).stopReason).toBe("end_turn")
+    acp.server.send(
+      permissionAsked("ses_background", "perm_background", {
+        action: "read",
+        source: { type: "tool", messageID: "msg_tools", id: "call_read" },
+      }),
+    )
+    await acp.until(() => acp.server.replies.length === 1, "background permission reply")
+
+    expect(toolCallTrail(acp, "ses_background:call_read")).toEqual([
+      "tool_call:pending",
+      "tool_call_update:in_progress",
+      "response",
+      "request",
+    ])
+    expect(acp.permissions[0]?.toolCall.rawInput).toEqual({ path: "/workspace/notes.md" })
   })
 
   test("asks for a background child's permission after the parent turn ends without the child capability", async () => {
@@ -270,8 +370,9 @@ describe("acp permissions over the wire", () => {
         },
       },
     ])
-    await acp.until(() => toolCallTrail(acp, "ses_background:perm_background").length === 3, "settled ask")
+    await acp.until(() => toolCallTrail(acp, "ses_background:perm_background").length === 4, "settled ask")
     expect(toolCallTrail(acp, "ses_background:perm_background")).toEqual([
+      "response",
       "tool_call:pending",
       "request",
       "tool_call_update:completed",
@@ -438,8 +539,12 @@ describe("acp permissions over the wire", () => {
 
     expect(await prompt).toMatchObject({ stopReason: "cancelled" })
     expect(decisions(acp)).toEqual([["perm_cancel", "reject"]])
-    await acp.until(() => toolCallTrail(acp, "perm_cancel").length === 3, "settled ask")
-    expect(toolCallTrail(acp, "perm_cancel")).toEqual(["tool_call:pending", "request", "tool_call_update:failed"])
+    expect(toolCallTrail(acp, "perm_cancel")).toEqual([
+      "tool_call:pending",
+      "request",
+      "tool_call_update:failed",
+      "response",
+    ])
     const asked = acp.received.find(
       (message): message is AnyRequest =>
         "method" in message && "id" in message && message.method === "session/request_permission",
@@ -471,11 +576,43 @@ describe("acp permissions over the wire", () => {
 
     expect(await prompt).toMatchObject({ stopReason: "cancelled" })
     expect(acp.permissions.map((request) => request.toolCall.toolCallId)).toEqual(["perm_pending"])
-    expect(toolCallTrail(acp, "perm_queued")).toEqual([])
+    expect(toolCallTrail(acp, "perm_queued")).toEqual(["response"])
     expect(decisions(acp)).toEqual([
       ["perm_pending", "reject"],
       ["perm_queued", "reject"],
     ])
+  })
+
+  test("settles an announced ask that a cancel interrupts mid-announce before the prompt responds", async () => {
+    const announcing = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    await using acp = await startSession({
+      onPrompt: ({ sessionID, id }) => [
+        delivered(sessionID, id),
+        childCreated("ses_open", sessionID, "Outlives the turn"),
+        permissionAsked(sessionID, "perm_announce"),
+      ],
+      outgoing: (message) => {
+        if (!isToolCallUpdate(message) || message.params.update.sessionUpdate !== "tool_call") return
+        announcing.resolve()
+        return release.promise
+      },
+      cancelDrainTimeout: "10 millis",
+      permission: allowOnce,
+    })
+
+    const prompt = acp.prompt(acp.sessionId, "hello")
+    await announcing.promise
+    await acp.notify("session/cancel", { sessionId: acp.sessionId })
+    await acp.until(() => acp.server.interrupts.length === 1, "server interrupt")
+    // Outlasts the drain timeout, so the turn hands off its open child while the announce is still held.
+    await Bun.sleep(100)
+    release.resolve()
+
+    expect(await prompt).toMatchObject({ stopReason: "cancelled" })
+    expect(toolCallTrail(acp, "perm_announce")).toEqual(["tool_call:pending", "tool_call_update:failed", "response"])
+    expect(acp.permissions).toEqual([])
+    expect(decisions(acp)).toEqual([["perm_announce", "reject"]])
   })
 })
 
@@ -572,8 +709,9 @@ describe("acp edit previews over the wire", () => {
     })
   })
 
-  test("previews new files without original content", async () => {
+  test("previews only missing files as new", async () => {
     await using dir = await tmpdir()
+    await fs.mkdir(path.join(dir.path, "folder"))
     const patchText = ["*** Begin Patch", "*** Add File: added.ts", "+one", "*** End Patch"].join("\n")
     await using acp = await startWire({
       onPrompt: ({ sessionID, id }) =>
@@ -598,6 +736,12 @@ describe("acp edit previews over the wire", () => {
             action: "edit",
             source: { type: "tool", messageID: "msg_edit", id: "call_edit" },
           }),
+          toolStarted(sessionID, "call_folder", "write"),
+          toolCalled(sessionID, "call_folder", { path: "folder", content: "three\n" }),
+          permissionAsked(sessionID, "perm_folder", {
+            action: "edit",
+            source: { type: "tool", messageID: "msg_folder", id: "call_folder" },
+          }),
         ),
       permission: allowOnce,
     })
@@ -609,6 +753,7 @@ describe("acp edit previews over the wire", () => {
     expect(acp.permissions.map((request) => request.toolCall.content)).toEqual([
       [{ type: "diff", path: path.join(dir.path, "written.ts"), oldText: null, newText: "two\n" }],
       [{ type: "diff", path: path.join(dir.path, "added.ts"), oldText: null, newText: "one\n" }],
+      undefined,
       undefined,
     ])
   })
@@ -732,14 +877,17 @@ function decisions(acp: Wire) {
   return acp.server.replies.map((reply) => [reply.requestID, reply.decision])
 }
 
-// What the client received about one tool call, in wire order.
+// What the client received about one tool call, in wire order, with each prompt response.
 function toolCallTrail(acp: Wire, toolCallId: string) {
   return acp.received.flatMap((message) => {
+    if (isPromptResponse(message)) return ["response"]
     if (isPermissionRequest(message)) return message.params.toolCall.toolCallId === toolCallId ? ["request"] : []
     if (!isToolCallUpdate(message) || message.params.update.toolCallId !== toolCallId) return []
     return [`${message.params.update.sessionUpdate}:${message.params.update.status}`]
   })
 }
+
+const isPromptResponse = Schema.is(Schema.Struct({ result: Schema.Struct({ stopReason: Schema.String }) }))
 
 const isPermissionRequest = Schema.is(
   Schema.Struct({
