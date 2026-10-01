@@ -206,7 +206,7 @@ describe("acp session lifecycle over the wire", () => {
   })
 
   test("detaches sessions whose new or resume fails after attaching", async () => {
-    // A model without a name loads, then fails building config options once the session is attached.
+    // A model without a name forces a crash building config options after attach.
     await using acp = await startWire({
       fetch: (request) =>
         request.path === "/api/model"
@@ -218,14 +218,16 @@ describe("acp session lifecycle over the wire", () => {
     })
     acp.server.sessions.set("ses_resumed", makeSession("ses_resumed"))
     await acp.initialize()
+    const existing = new Set(acp.server.sessions.keys())
 
     expect(await rpcError(acp.newSession())).toMatchObject({ code: -32603 })
+    const created = acp.server.sessions.keys().find((id) => !existing.has(id))
+    if (!created) throw new Error("session/new did not create a server session")
     expect(
       await rpcError(acp.request("session/resume", { cwd: "/workspace", sessionId: "ses_resumed", mcpServers: [] })),
     ).toMatchObject({ code: -32603 })
-    const failed = [...acp.server.sessions.keys()]
+    const failed = [created, "ses_resumed"]
 
-    expect(failed).toHaveLength(2)
     expect(
       await Promise.all(
         failed.map((sessionId) =>
@@ -233,6 +235,7 @@ describe("acp session lifecycle over the wire", () => {
         ),
       ),
     ).toMatchObject(failed.map((sessionId) => ({ code: -32602, data: { sessionId } })))
+    expect(acp.server.sessions.has(created)).toBe(true)
   })
 
   test("lists server-backed pages for the requested cwd", async () => {
