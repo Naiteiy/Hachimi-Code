@@ -35,14 +35,12 @@ export function contentBlockToParts(block: ContentBlock): PromptPart[] {
           },
         ]
       }
-      if (block.uri?.startsWith("data:") || block.uri?.startsWith("http://") || block.uri?.startsWith("https://")) {
+      if (block.uri?.startsWith("data:")) {
+        return [{ type: "file", url: block.uri, filename: "image", mime: block.mimeType }]
+      }
+      if (block.uri) {
         return [
-          {
-            type: "file",
-            url: block.uri,
-            filename: filenameFromUri(block.uri) ?? "image",
-            mime: block.mimeType,
-          },
+          resourceLinkToPart({ uri: block.uri, name: filenameFromUri(block.uri) ?? "image", mimeType: block.mimeType }),
         ]
       }
       return []
