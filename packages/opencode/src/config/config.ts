@@ -453,7 +453,9 @@ const layer = Layer.effect(
             .install(dir, {
               add: [
                 {
-                  name: "@hachimi-code/plugin",
+                  // Published upstream name: the plugin package is installed from the registry,
+                  // so it must keep the name it is actually published under.
+                  name: "@opencode-ai/plugin",
                   version: InstallationLocal ? undefined : InstallationVersion,
                 },
               ],
