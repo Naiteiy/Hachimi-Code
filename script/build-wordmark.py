@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""Rebuild the block-letter wordmark from a real font.
+"""Build the block-letter wordmark from a hand-encoded pixel font.
 
-Hand-drawing glyphs at this size produced unreadable shapes, so the wordmark is
-generated instead: the text is rendered with a system font at high resolution,
-downsampled to a small pixel grid, thresholded, and mapped onto block
-characters. Each cell carries two vertically stacked pixels, which is why the
-renderer draws them with upper/lower half blocks.
+Rendering an outline font and thresholding it produced stray single pixels and
+broken half-block fragments, because antialiased strokes land on sub-pixel
+boundaries. A 5x7 dot-matrix font has no sub-pixel geometry: every stroke is a
+whole pixel, and each pixel is drawn as an upper half block so that it stays
+square (a terminal cell is roughly twice as tall as it is wide).
 
-  python3 script/build-wordmark.py                    # rewrite both consumers
-  python3 script/build-wordmark.py --preview          # print candidates only
-
-Widths are chosen so the result fits an 80 column terminal. Uppercase is used
-because capitals hold up far better than lowercase at this pixel size.
+  python3 script/build-wordmark.py              # rewrite the consumers
+  python3 script/build-wordmark.py --scale 2    # double the pixel size
+  python3 script/build-wordmark.py --preview    # print without writing
 """
 
 from __future__ import annotations
@@ -21,47 +19,64 @@ import json
 import pathlib
 import re
 
-from PIL import Image, ImageDraw, ImageFont
+# 5 wide x 7 tall, uppercase, one character per pixel. Strokes are exactly one
+# pixel so the result stays crisp at any integer scale.
+FONT: dict[str, list[str]] = {
+    "A": [".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
+    "C": [".###.", "#...#", "#....", "#....", "#....", "#...#", ".###."],
+    "D": ["####.", "#...#", "#...#", "#...#", "#...#", "#...#", "####."],
+    "E": ["#####", "#....", "#....", "####.", "#....", "#....", "#####"],
+    "H": ["#...#", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
+    "I": ["#####", "..#..", "..#..", "..#..", "..#..", "..#..", "#####"],
+    "M": ["#...#", "##.##", "#.#.#", "#...#", "#...#", "#...#", "#...#"],
+    "O": [".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
+}
 
-NARROW_BOLD = "/System/Library/Fonts/Supplemental/Arial Narrow Bold.ttf"
-ARIAL_BOLD = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
-
-# The two halves are rendered separately so the renderer can tint them apart.
 LEFT = "HACHIMI"
 RIGHT = "CODE"
-GAP = 3
+GLYPH_WIDTH = 5
+GLYPH_HEIGHT = 7
+LETTER_GAP = 1
+WORD_GAP = 3
+# Glyph rows are padded to an even count so each terminal cell can carry a pair
+# of dots: a cell holds two vertically stacked square dots, which is what keeps
+# pixels square and vertical strokes unbroken.
+PADDED_HEIGHT = 8
 
 
-def render(text: str, font_path: str, height: int, threshold: int) -> Image.Image:
-    size = 400
-    font = ImageFont.truetype(font_path, size)
-    canvas = Image.new("L", (size * len(text) * 2, size * 2), 0)
-    ImageDraw.Draw(canvas).text((size // 2, size // 2), text, font=font, fill=255)
-    glyphs = canvas.crop(canvas.getbbox())
-    width = max(1, round(glyphs.width * height / glyphs.height))
-    small = glyphs.resize((width, height), Image.LANCZOS)
-    return small.point(lambda value: 255 if value >= threshold else 0)
+def dots(word: str, scale: int) -> list[str]:
+    """Lay the word out as a dot grid with one character per dot."""
+    columns: list[str] = []
+    for index, char in enumerate(word):
+        if index:
+            columns.extend([" " * GLYPH_HEIGHT] * LETTER_GAP)
+        glyph = FONT[char]
+        columns.extend("".join(glyph[row][column] for row in range(GLYPH_HEIGHT)) for column in range(GLYPH_WIDTH))
 
-
-def to_rows(bitmap: Image.Image) -> list[str]:
-    """One cell = 1px wide x 2px tall -> full block, top half, bottom half, blank."""
-    px = bitmap.load()
-    rows = []
-    for y in range(0, bitmap.height, 2):
+    grid: list[str] = []
+    for row in range(GLYPH_HEIGHT * scale):
         line = ""
-        for x in range(bitmap.width):
-            top = px[x, y] > 0
-            bottom = y + 1 < bitmap.height and px[x, y + 1] > 0
-            line += "█" if top and bottom else "▀" if top else "▄" if bottom else " "
+        for column in columns:
+            line += ("#" if column[row // scale] == "#" else " ") * scale
+        grid.append(line)
+    blank = " " * len(grid[0])
+    while len(grid) % 2:
+        grid.append(blank)
+    return grid
+
+
+def render(word: str, scale: int) -> list[str]:
+    """Fold dot pairs into cells: both dots solid, a lone dot becomes a half block."""
+    grid = dots(word, scale)
+    rows: list[str] = []
+    for y in range(0, len(grid), 2):
+        top, bottom = grid[y], grid[y + 1]
+        line = ""
+        for x in range(len(top)):
+            up, down = top[x] == "#", bottom[x] == "#"
+            line += "█" if up and down else "▀" if up else "▄" if down else " "
         rows.append(line)
     return rows
-
-
-def build(font_path: str, height: int, threshold: int, gap: int) -> tuple[list[str], list[str], list[str]]:
-    left = to_rows(render(LEFT, font_path, height, threshold))
-    right = to_rows(render(RIGHT, font_path, height, threshold))
-    plain = [f"{l}{' ' * gap}{r}".replace("_", " ") for l, r in zip(left, right)]
-    return left, right, plain
 
 
 def write_tui(left: list[str], right: list[str]) -> None:
@@ -79,47 +94,42 @@ def write_tui(left: list[str], right: list[str]) -> None:
     )
 
 
-def write_cli(plain: list[str], gap: int) -> None:
-    """Keep the non-TTY banner and the TTY gap in step with the shared art."""
-    path = pathlib.Path("packages/opencode/src/cli/ui.ts")
-    text = path.read_text()
+def write_consumers(plain: list[str], gap: int) -> None:
+    """Keep the CLI banner, the TTY gap, the home logo and the pulse in step."""
+    ui = pathlib.Path("packages/opencode/src/cli/ui.ts")
+    text = ui.read_text()
     block = "const wordmark = [\n" + "".join(f"  `{row}`,\n" for row in plain) + "]"
-    path.write_text(re.sub(r"const wordmark = \[.*?\n\]", block, text, flags=re.S))
-
-    banner = pathlib.Path("packages/tui/src/component/bg-pulse-render.ts")
-    banner.write_text(re.sub(r"const LOGO_GAP = \d+", f"const LOGO_GAP = {gap}", banner.read_text()))
+    text = re.sub(r"const wordmark = \[.*?\n\]", block, text, flags=re.S)
+    text = re.sub(r'const gap = " *"', f'const gap = "{" " * gap}"', text)
+    ui.write_text(text)
 
     home = pathlib.Path("packages/tui/src/component/logo.tsx")
     home.write_text(re.sub(r"gap=\{\d+\}", f"gap={{{gap}}}", home.read_text(), count=1))
 
-    ui = pathlib.Path("packages/opencode/src/cli/ui.ts")
-    ui.write_text(re.sub(r'const gap = " +"', f'const gap = "{" " * gap}"', ui.read_text()))
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--height", type=int, default=8, help="cap height in pixels (default 8)")
-    parser.add_argument("--threshold", type=int, default=150, help="binarisation threshold (default 150)")
-    parser.add_argument("--gap", type=int, default=GAP, help="blank columns between the halves")
-    parser.add_argument("--font", default=NARROW_BOLD, help="font file to render with")
-    parser.add_argument("--preview", action="store_true", help="print candidates and exit")
+    parser.add_argument("--scale", type=int, default=1, help="pixels per font dot (default 1)")
+    parser.add_argument("--gap", type=int, default=WORD_GAP, help="blank cells between the two halves")
+    parser.add_argument("--preview", action="store_true", help="print the result and exit")
     args = parser.parse_args()
 
+    left = render(LEFT, args.scale)
+    right = render(RIGHT, args.scale)
+    width = len(left[0]) + args.gap + len(right[0])
+
     if args.preview:
-        for label, font in (("narrow-bold", NARROW_BOLD), ("arial-bold", ARIAL_BOLD)):
-            left, right, _ = build(font, args.height, args.threshold, args.gap)
-            print(f"\n--- {label}: {len(left[0])}+{args.gap}+{len(right[0])} = {len(left[0]) + args.gap + len(right[0])} cols")
-            for row in left + right:
-                print("   " + row)
+        for l, r in zip(left, right):
+            print("   " + l + " " * args.gap + r)
+        print(f"\n   {len(left)} rows, {len(left[0])} + {args.gap} + {len(right[0])} = {width} columns")
         return
 
-    left, right, plain = build(args.font, args.height, args.threshold, args.gap)
+    plain = [f"{l}{' ' * args.gap}{r}" for l, r in zip(left, right)]
     write_tui(left, right)
-    write_cli(plain, args.gap)
-
-    print(f"wordmark rebuilt: {len(left[0])} + {args.gap} + {len(right[0])} = {len(left[0]) + args.gap + len(right[0])} cols, {len(left)} rows")
+    write_consumers(plain, args.gap)
+    print(f"wordmark rebuilt: {len(left)} rows, {width} columns (scale {args.scale})")
     for row in plain:
-        print("   " + row.replace("█", "█"))
+        print("   " + row)
 
 
 if __name__ == "__main__":
