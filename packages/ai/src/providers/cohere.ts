@@ -7,6 +7,7 @@ import { ProviderID, type ModelID, type OpenString } from "../schema/index.js"
 import type { ProviderPackage } from "../provider-package.js"
 
 export const id = ProviderID.make("cohere")
+const COMPATIBILITY_BASE_URL = "https://api.cohere.ai/compatibility/v1"
 export type ProviderOptions = CohereChat.ProviderOptionsInput & {
   readonly reasoningEffort?: OpenString<"none" | "high">
 }
@@ -24,7 +25,7 @@ export const chatRoute = Route.make({
   provider: id,
   providerMetadataKey: "cohere",
   protocol: OpenAIChat.protocol,
-  endpoint: Endpoint.path("/chat/completions", { baseURL: "https://api.cohere.ai/compatibility/v1" }),
+  endpoint: Endpoint.path("/chat/completions", { baseURL: COMPATIBILITY_BASE_URL }),
   framing: OpenAIChat.framing,
 })
 export const routes = [route, chatRoute]
@@ -33,11 +34,7 @@ export const configure = (input: LanguageModelOptions = {}) => {
   const { apiKey: _apiKey, auth: _auth, baseURL, ...defaults } = input
   const auth = AuthOptions.bearer(input, "COHERE_API_KEY")
   const native = route.with({ ...defaults, auth, endpoint: { baseURL: baseURL ?? CohereChat.DEFAULT_BASE_URL } })
-  const chat = chatRoute.with({
-    ...defaults,
-    auth,
-    endpoint: { baseURL: baseURL ?? "https://api.cohere.ai/compatibility/v1" },
-  })
+  const chat = chatRoute.with({ ...defaults, auth, endpoint: { baseURL: baseURL ?? COMPATIBILITY_BASE_URL } })
   return {
     id,
     model: (modelID: string | ModelID) => native.model<CohereChat.ProviderOptionsInput>({ id: modelID }),

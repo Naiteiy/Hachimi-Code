@@ -75,17 +75,16 @@ const NativeUsage = Schema.Struct({
   billed_units: Schema.optional(TokenCounts),
   cached_tokens: Schema.optional(Schema.Number),
 })
-const ContentDelta = Schema.Struct({
-  type: Schema.optional(Schema.String),
-  text: Schema.optional(Schema.String),
-  thinking: Schema.optional(Schema.String),
-})
 const Event = Schema.Union([
   Schema.Struct({ type: Schema.Literal("message-start") }),
   Schema.Struct({
     type: Schema.Literals(["content-start", "content-delta"]),
     index: Schema.Number,
-    delta: Schema.Struct({ message: Schema.Struct({ content: ContentDelta }) }),
+    delta: Schema.Struct({
+      message: Schema.Struct({
+        content: Schema.Struct({ text: Schema.optional(Schema.String), thinking: Schema.optional(Schema.String) }),
+      }),
+    }),
   }),
   Schema.Struct({ type: Schema.Literal("content-end"), index: Schema.Number }),
   Schema.Struct({
@@ -94,7 +93,7 @@ const Event = Schema.Union([
   }),
   Schema.Struct({
     type: Schema.Literals(["tool-call-start", "tool-call-delta"]),
-    index: Schema.optional(Schema.Number),
+    index: Schema.Number,
     delta: Schema.Struct({
       message: Schema.Struct({
         tool_calls: Schema.Struct({
@@ -104,7 +103,7 @@ const Event = Schema.Union([
       }),
     }),
   }),
-  Schema.Struct({ type: Schema.Literal("tool-call-end"), index: Schema.optional(Schema.Number) }),
+  Schema.Struct({ type: Schema.Literal("tool-call-end"), index: Schema.Number }),
   Schema.Struct({
     type: Schema.Literal("message-end"),
     delta: Schema.Struct({ finish_reason: Schema.String, usage: Schema.optional(NativeUsage) }),
@@ -116,9 +115,10 @@ type Event = typeof Event.Type
 type State = {
   readonly lifecycle: Lifecycle.State
   readonly tools: ToolStream.State<number>
-  readonly toolIndex: number
   readonly finished: boolean
 }
+
+const TOOL_CHOICE = { auto: undefined, none: "NONE", required: "REQUIRED", tool: "REQUIRED" } as const
 
 const fromRequest = Effect.fn("CohereChat.fromRequest")(function* (request: LLMRequest) {
   const options = yield* ProviderShared.validateWith(Schema.decodeUnknownEffect(Options))(request.providerOptions ?? {})
@@ -128,8 +128,7 @@ const fromRequest = Effect.fn("CohereChat.fromRequest")(function* (request: LLMR
     : []
   for (const message of flattened.request.messages) {
     if (message.role === "system") {
-      const update = yield* ProviderShared.wrappedSystemUpdate("Cohere Chat", message)
-      messages.push({ role: "user", content: update.text })
+      messages.push({ role: "user", content: (yield* ProviderShared.wrappedSystemUpdate("Cohere Chat", message)).text })
       continue
     }
     if (message.role === "tool") {
@@ -156,11 +155,8 @@ const fromRequest = Effect.fn("CohereChat.fromRequest")(function* (request: LLMR
         continue
       }
       if (message.role === "assistant" && part.type === "tool-call") {
-        calls.push({
-          id: part.id,
-          type: "function",
-          function: { name: part.name, arguments: ProviderShared.encodeJson(part.input) },
-        })
+        const args = ProviderShared.encodeJson(part.input)
+        calls.push({ id: part.id, type: "function", function: { name: part.name, arguments: args } })
         continue
       }
       if (message.role === "user" && part.type === "media" && part.media.mediaType.startsWith("image/")) {
@@ -184,8 +180,8 @@ const fromRequest = Effect.fn("CohereChat.fromRequest")(function* (request: LLMR
     })
   }
   const selected = request.toolChoice?.type === "tool" ? request.toolChoice.name : undefined
-  const tools = selected ? flattened.tools.filter((tool) => tool.name === selected) : flattened.tools
-  if (request.toolChoice?.type === "tool" && (!selected || tools.length === 0))
+  const tools = selected === undefined ? flattened.tools : flattened.tools.filter((tool) => tool.name === selected)
+  if (selected !== undefined && tools.length === 0)
     return yield* ProviderShared.invalidRequest("Cohere Chat tool choice must name an available tool")
   if (tools.some((tool) => tool.native !== undefined))
     return yield* ProviderShared.invalidRequest("Cohere Chat does not support provider-defined tools")
@@ -199,15 +195,11 @@ const fromRequest = Effect.fn("CohereChat.fromRequest")(function* (request: LLMR
           function: { name: tool.name, description: tool.description, parameters: tool.inputSchema },
         }))
       : undefined,
-    tool_choice:
-      request.toolChoice?.type === "none"
-        ? ("NONE" as const)
-        : request.toolChoice?.type === "required" || selected
-          ? ("REQUIRED" as const)
-          : undefined,
-    thinking: options.thinking
-      ? { type: options.thinking.type ?? "enabled", token_budget: options.thinking.tokenBudget }
-      : undefined,
+    tool_choice: TOOL_CHOICE[request.toolChoice?.type ?? "auto"],
+    thinking: options.thinking && {
+      type: options.thinking.type ?? "enabled",
+      token_budget: options.thinking.tokenBudget,
+    },
     max_tokens: request.generation?.maxTokens,
     temperature: request.generation?.temperature,
     p: request.generation?.topP,
@@ -219,104 +211,76 @@ const fromRequest = Effect.fn("CohereChat.fromRequest")(function* (request: LLMR
   }
 })
 
-const finishReason = (raw: string): FinishReasonDetails => ({
-  normalized:
-    raw === "COMPLETE" || raw === "STOP_SEQUENCE"
-      ? "stop"
-      : raw === "MAX_TOKENS"
-        ? "length"
-        : raw === "TOOL_CALL"
-          ? "tool-calls"
-          : raw === "ERROR" || raw === "TIMEOUT"
-            ? "error"
-            : "unknown",
-  raw,
-})
-const mapUsage = (usage: typeof NativeUsage.Type | undefined) =>
-  usage
-    ? new Usage({
-        inputTokens: usage.tokens?.input_tokens,
-        outputTokens: usage.tokens?.output_tokens,
-        nonCachedInputTokens: ProviderShared.subtractTokens(usage.tokens?.input_tokens, usage.cached_tokens),
-        cacheReadInputTokens: usage.cached_tokens,
-        reasoningTokens: usage.tokens?.reasoning_tokens,
-        totalTokens: ProviderShared.totalTokens(usage.tokens?.input_tokens, usage.tokens?.output_tokens, undefined),
-        providerMetadata: { cohere: usage },
-      })
-    : undefined
+const finishReason = (raw: string): FinishReasonDetails => {
+  switch (raw) {
+    case "COMPLETE":
+    case "STOP_SEQUENCE":
+      return { normalized: "stop", raw }
+    case "MAX_TOKENS":
+      return { normalized: "length", raw }
+    case "TOOL_CALL":
+      return { normalized: "tool-calls", raw }
+    case "ERROR":
+    case "TIMEOUT":
+      return { normalized: "error", raw }
+    default:
+      return { normalized: "unknown", raw }
+  }
+}
 
+const mapUsage = (usage: typeof NativeUsage.Type) =>
+  new Usage({
+    inputTokens: usage.tokens?.input_tokens,
+    outputTokens: usage.tokens?.output_tokens,
+    nonCachedInputTokens: ProviderShared.subtractTokens(usage.tokens?.input_tokens, usage.cached_tokens),
+    cacheReadInputTokens: usage.cached_tokens,
+    reasoningTokens: usage.tokens?.reasoning_tokens,
+    totalTokens: ProviderShared.totalTokens(usage.tokens?.input_tokens, usage.tokens?.output_tokens, undefined),
+    providerMetadata: { cohere: usage },
+  })
+
+// Lifecycle deltas open blocks on demand and ends are no-ops for closed blocks, so content-start needs no handling.
 const step = Effect.fn("CohereChat.step")(function* (state: State, event: Event) {
   const events: LLMEvent[] = []
   switch (event.type) {
     case "message-start":
       return [{ ...state, lifecycle: Lifecycle.stepStart(state.lifecycle, events) }, events] as const
-    case "content-start":
     case "content-delta": {
       const id = String(event.index)
       const content = event.delta.message.content
-      const thinking = content.type === "thinking" || content.thinking !== undefined
-      const text = thinking ? content.thinking : content.text
       const lifecycle =
-        event.type === "content-start"
-          ? thinking
-            ? Lifecycle.reasoningStart(state.lifecycle, events, id)
-            : Lifecycle.textStart(state.lifecycle, events, id)
-          : thinking
-            ? Lifecycle.reasoningDelta(state.lifecycle, events, id, text ?? "")
-            : Lifecycle.textDelta(state.lifecycle, events, id, text ?? "")
+        content.thinking !== undefined
+          ? Lifecycle.reasoningDelta(state.lifecycle, events, id, content.thinking)
+          : Lifecycle.textDelta(state.lifecycle, events, id, content.text ?? "")
       return [{ ...state, lifecycle }, events] as const
     }
     case "content-end": {
       const id = String(event.index)
-      return [
-        {
-          ...state,
-          lifecycle: state.lifecycle.reasoning.has(id)
-            ? Lifecycle.reasoningEnd(state.lifecycle, events, id)
-            : Lifecycle.textEnd(state.lifecycle, events, id),
-        },
-        events,
-      ] as const
+      const lifecycle = Lifecycle.textEnd(Lifecycle.reasoningEnd(state.lifecycle, events, id), events, id)
+      return [{ ...state, lifecycle }, events] as const
     }
-    case "tool-plan-delta":
-      return [
-        {
-          ...state,
-          lifecycle: Lifecycle.reasoningDelta(state.lifecycle, events, "tool-plan", event.delta.message.tool_plan, {
-            cohere: { toolPlan: true },
-          }),
-        },
-        events,
-      ] as const
-    case "tool-call-start": {
-      const index = event.index ?? 0
+    case "tool-plan-delta": {
+      const plan = event.delta.message.tool_plan
+      const lifecycle = Lifecycle.reasoningDelta(state.lifecycle, events, "tool-plan", plan, {
+        cohere: { toolPlan: true },
+      })
+      return [{ ...state, lifecycle }, events] as const
+    }
+    case "tool-call-start":
+    case "tool-call-delta": {
       const call = event.delta.message.tool_calls
       const result = ToolStream.appendOrStart(
         ADAPTER,
         state.tools,
-        index,
+        event.index,
         { id: call.id, name: call.function.name, text: call.function.arguments ?? "" },
-        "Cohere tool start is missing id or name",
-      )
-      if (ToolStream.isError(result)) return yield* result
-      return [
-        { ...state, toolIndex: index, tools: result.tools, lifecycle: Lifecycle.stepStart(state.lifecycle, events) },
-        [...events, ...result.events],
-      ] as const
-    }
-    case "tool-call-delta": {
-      const result = ToolStream.appendExisting(
-        ADAPTER,
-        state.tools,
-        event.index ?? state.toolIndex,
-        event.delta.message.tool_calls.function.arguments ?? "",
-        "Cohere tool delta arrived without a start",
+        "Cohere tool call is missing id or name",
       )
       if (ToolStream.isError(result)) return yield* result
       return [{ ...state, tools: result.tools }, result.events] as const
     }
     case "tool-call-end": {
-      const result = yield* ToolStream.finish(ADAPTER, state.tools, event.index ?? state.toolIndex)
+      const result = yield* ToolStream.finish(ADAPTER, state.tools, event.index)
       return [{ ...state, tools: result.tools }, result.events ?? []] as const
     }
     case "message-end": {
@@ -324,9 +288,9 @@ const step = Effect.fn("CohereChat.step")(function* (state: State, event: Event)
       events.push(...pending.events)
       const lifecycle = Lifecycle.finish(state.lifecycle, events, {
         reason: finishReason(event.delta.finish_reason),
-        usage: mapUsage(event.delta.usage),
+        usage: event.delta.usage && mapUsage(event.delta.usage),
       })
-      return [{ ...state, tools: pending.tools, lifecycle, finished: true }, events] as const
+      return [{ tools: pending.tools, lifecycle, finished: true }, events] as const
     }
     default:
       return [state, events] as const
@@ -338,12 +302,7 @@ export const protocol = Protocol.make({
   body: { schema: Body, from: fromRequest },
   stream: {
     event: Protocol.jsonEvent(Event),
-    initial: (): State => ({
-      lifecycle: Lifecycle.initial(),
-      tools: ToolStream.empty(),
-      toolIndex: 0,
-      finished: false,
-    }),
+    initial: (): State => ({ lifecycle: Lifecycle.initial(), tools: ToolStream.empty(), finished: false }),
     step,
     terminal: (event) => event.type === "message-end",
     onHalt: (state) =>
