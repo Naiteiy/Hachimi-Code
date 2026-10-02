@@ -1,5 +1,7 @@
 import { Vcs } from "@opencode/core/vcs"
 import { Project } from "@opencode/core/project"
+import { Worktree } from "@opencode/core/worktree"
+import { Bus } from "@opencode/core/bus"
 import { Plugin } from "@opencode/core/plugin"
 import { Location } from "@opencode/core/location"
 import { LocationServiceMap } from "@opencode/core/location-services"
@@ -13,6 +15,7 @@ import { response } from "../location"
 export const VcsHandler = HttpApiBuilder.group(Api, "server.vcs", (handlers) =>
   Effect.gen(function* () {
     const project = yield* Project.Service
+    const bus = yield* Bus.Service
     const locations = yield* LocationServiceMap.Service
     return handlers
       .handle("vcs.init", (ctx) =>
@@ -41,11 +44,13 @@ export const VcsHandler = HttpApiBuilder.group(Api, "server.vcs", (handlers) =>
               return new ServiceUnavailableError({ service: providerID, message: "VCS initialization failed" })
             }),
           )
-          if (!(yield* project.resolve(directory)).vcs)
+          const resolved = yield* project.resolve(directory)
+          if (!resolved.vcs)
             return yield* new ServiceUnavailableError({ service: providerID, message: "VCS initialization failed" })
           yield* locations.invalidate(
             Location.Ref.make({ directory: location.directory, workspaceID: location.workspaceID }),
           )
+          yield* bus.publish(Worktree.Event.Updated, { projectID: resolved.id })
           return HttpApiSchema.NoContent.make()
         }),
       )
