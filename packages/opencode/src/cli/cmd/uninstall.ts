@@ -24,7 +24,7 @@ interface RemovalTargets {
 
 export const UninstallCommand = {
   command: "uninstall",
-  describe: "uninstall opencode and remove all related files",
+  describe: "uninstall hachimicode and remove all related files",
   builder: (yargs: Argv) =>
     yargs
       .option("keep-config", {
@@ -133,9 +133,9 @@ async function showRemovalSummary(targets: RemovalTargets, method: Installation.
       pnpm: "pnpm uninstall -g opencode-ai",
       bun: "bun remove -g opencode-ai",
       yarn: "yarn global remove opencode-ai",
-      brew: "brew uninstall opencode",
-      choco: "choco uninstall opencode",
-      scoop: "scoop uninstall opencode",
+      brew: "brew uninstall hachimicode",
+      choco: "choco uninstall hachimicode",
+      scoop: "scoop uninstall hachimicode",
     }
     prompts.log.info(`  ✓ Package: ${cmds[method] || method}`)
   }

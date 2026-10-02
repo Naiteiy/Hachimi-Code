@@ -6,7 +6,7 @@ import { ServerAuth } from "@/server/auth"
 
 export const AttachCommand = cmd({
   command: "attach <url>",
-  describe: "attach to a running opencode server",
+  describe: "attach to a running hachimicode server",
   builder: (yargs) =>
     yargs
       .positional("url", {
@@ -40,7 +40,7 @@ export const AttachCommand = cmd({
       .option("username", {
         alias: ["u"],
         type: "string",
-        describe: "basic auth username (defaults to HACHIMICODE_SERVER_USERNAME or 'opencode')",
+        describe: "basic auth username (defaults to HACHIMICODE_SERVER_USERNAME or 'hachimicode')",
       })
       .option("mini", {
         type: "boolean",

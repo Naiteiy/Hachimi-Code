@@ -131,7 +131,7 @@ export const GlobalApi = HttpApi.make("global").add(
         OpenApi.annotations({
           identifier: "global.upgrade",
           summary: "Upgrade opencode",
-          description: "Upgrade opencode to the specified version.",
+          description: "Upgrade hachimicode to the specified version.",
         }),
       ),
     )

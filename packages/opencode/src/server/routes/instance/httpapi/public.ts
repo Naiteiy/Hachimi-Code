@@ -531,7 +531,7 @@ export const PublicApi = HachimiCodeHttpApi.annotateMerge(
   OpenApi.annotations({
     title: "opencode",
     version: "1.0.0",
-    description: "opencode api",
+    description: "hachimicode api",
     transform: matchLegacyOpenApi,
   }),
 )
