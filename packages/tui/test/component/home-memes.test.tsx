@@ -9,7 +9,10 @@ let setup: Awaited<ReturnType<typeof testRender>> | undefined
 afterEach(() => {
   setup?.renderer.destroy()
   setup = undefined
+  field = undefined
 })
+
+let field: MemeFieldRenderable | undefined
 
 const BASE = RGBA.fromInts(0x17, 0x0f, 0x07)
 // A fixed step keeps the drift and the animation frames reproducible in tests.
@@ -37,9 +40,18 @@ const BUDGET = memes.sprites.slice(0, MEME_COUNT).reduce((total, sprite) => {
   return total + Math.max(...perFrame)
 }, 0)
 
-async function mount(seed: number, width = 60, height = 20) {
+async function mount(seed: number, width = 100, height = 30) {
   setup = await testRender(
-    () => <meme_field width={width} height={height} baseColor={BASE} seed={seed} fixedStep={STEP} />,
+    () => (
+      <meme_field
+        ref={(value: MemeFieldRenderable) => (field = value)}
+        width={width}
+        height={height}
+        baseColor={BASE}
+        seed={seed}
+        fixedStep={STEP}
+      />
+    ),
     { width, height },
   )
   await setup.renderOnce()
@@ -48,6 +60,14 @@ async function mount(seed: number, width = 60, height = 20) {
 
 function painted(frame: string) {
   return frame.split("").filter((char) => char === "\u2580").length
+}
+
+function overlaps(a: { x: number; y: number; width: number; height: number }, b: typeof a) {
+  // Half a cell of slack so float rounding does not read as a collision.
+  const slack = 0.5
+  return (
+    a.x + slack < b.x + b.width && b.x + slack < a.x + a.width && a.y + slack < b.y + b.height && b.y + slack < a.y + a.height
+  )
 }
 
 describe("home meme field", () => {
@@ -79,19 +99,48 @@ describe("home meme field", () => {
   })
 
   test("never paints more than the sprites can occupy", async () => {
-    const field = await mount(9)
+    const view = await mount(9)
     for (let index = 0; index < 120; index++) {
-      await field.renderOnce()
-      expect(painted(field.captureCharFrame())).toBeLessThanOrEqual(BUDGET)
+      await view.renderOnce()
+      expect(painted(view.captureCharFrame())).toBeLessThanOrEqual(BUDGET)
     }
   })
 
   test("stays within the terminal bounds", async () => {
-    const field = await mount(3, 24, 12)
-    for (let index = 0; index < 120; index++) await field.renderOnce()
-    const lines = field.captureCharFrame().replace(/\n$/, "").split("\n")
+    const view = await mount(3, 24, 12)
+    for (let index = 0; index < 120; index++) await view.renderOnce()
+    const lines = view.captureCharFrame().replace(/\n$/, "").split("\n")
     expect(lines).toHaveLength(12)
     expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(24)
+  })
+
+  test("keeps every meme apart and inside the frame", async () => {
+    const view = await mount(21, 90, 26)
+    for (let index = 0; index < 200; index++) {
+      await view.renderOnce()
+      const boxes = field!.boxes
+      // A crowded frame places fewer memes, never overlapping ones.
+      expect(boxes.length).toBeGreaterThan(0)
+      expect(boxes.length).toBeLessThanOrEqual(MEME_COUNT)
+      for (const box of boxes) {
+        expect(box.x).toBeGreaterThanOrEqual(0)
+        expect(box.y).toBeGreaterThanOrEqual(0)
+        expect(box.x + box.width).toBeLessThanOrEqual(90)
+        expect(box.y + box.height).toBeLessThanOrEqual(26)
+      }
+      for (let a = 0; a < boxes.length; a++) {
+        for (let b = a + 1; b < boxes.length; b++) {
+          expect(overlaps(boxes[a]!, boxes[b]!)).toBe(false)
+        }
+      }
+    }
+  })
+
+  test("moves faster than a crawl", async () => {
+    await mount(4, 90, 26)
+    for (const box of field!.boxes) {
+      expect(Math.hypot(box.vx, box.vy)).toBeGreaterThan(3)
+    }
   })
 })
 

@@ -15,7 +15,9 @@ export const MEME_COUNT = 4
 /** Global alpha of the layer, so the memes read as a watermark behind the prompt. */
 const OPACITY = 0.35
 /** Drift speed in terminal cells per second. */
-const SPEED = 2.2
+const SPEED = 5
+/** Separation rounds per frame, so a three-way pile-up still resolves. */
+const COLLISION_PASSES = 4
 const TARGET_FPS = 20
 /** Cells whose two pixels are both below this alpha are left untouched. */
 const ALPHA_FLOOR = 8
@@ -23,7 +25,8 @@ const ALPHA_FLOOR = 8
 const MIN_STEP = 16
 const TOP_HALF = 0x2580
 const SPRITES = memes.sprites.length
-const WIDEST = Math.max(...memes.sprites.map((sprite) => sprite.w))
+// Average footprint, used to decide how many memes actually fit on screen.
+const AREA = memes.sprites.reduce((total, sprite) => total + sprite.w * (sprite.h / 2), 0) / SPRITES
 
 type Sprite = (typeof memes.sprites)[number]
 type Painted = { frame: number; base: RGBA; fg: (RGBA | undefined)[]; bg: (RGBA | undefined)[] }
@@ -34,6 +37,8 @@ type Actor = {
   y: number
   vx: number
   vy: number
+  /** Speed to restore after a collision, since an axis swap can cancel motion. */
+  speed: number
   frame: number
   elapsed: number
   painted?: Painted
@@ -111,12 +116,113 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
     // Memes move, so the previous frame has to be wiped or they leave trails.
     frameBuffer.clear()
     for (const actor of this.actors) {
-      const sprite = memes.sprites[actor.sprite]!
-      this.advance(actor, sprite, step, width, height)
-      this.paint(actor, sprite, width, height)
+      this.advance(actor, memes.sprites[actor.sprite]!, step, width, height)
+    }
+    this.separate(width, height)
+    for (const actor of this.actors) {
+      this.paint(actor, memes.sprites[actor.sprite]!, width, height)
     }
 
     super.renderSelf(buffer)
+  }
+
+  /** Current footprints, so tests can assert the sprites stay apart. */
+  get boxes() {
+    return this.actors.map((actor) => {
+      const sprite = memes.sprites[actor.sprite]!
+      return { x: actor.x, y: actor.y, width: sprite.w, height: sprite.h / 2, vx: actor.vx, vy: actor.vy }
+    })
+  }
+
+  /**
+   * Push overlapping memes apart along their shallowest overlap and swap the
+   * velocity on that axis, so a meeting reads as a bounce rather than a pass
+   * through. Runs a few rounds because one push can create the next overlap.
+   */
+  private separate(width: number, height: number) {
+    for (let pass = 0; pass < COLLISION_PASSES; pass++) {
+      let collided = false
+      for (let left = 0; left < this.actors.length; left++) {
+        for (let right = left + 1; right < this.actors.length; right++) {
+          const a = this.actors[left]!
+          const b = this.actors[right]!
+          const aSize = this.footprint(a)
+          const bSize = this.footprint(b)
+          const overlapX = Math.min(a.x + aSize.width, b.x + bSize.width) - Math.max(a.x, b.x)
+          const overlapY = Math.min(a.y + aSize.height, b.y + bSize.height) - Math.max(a.y, b.y)
+          if (overlapX <= 0 || overlapY <= 0) continue
+          collided = true
+
+          // Separate along the shallower overlap, but only where both memes
+          // actually have room: clamping at the frame edge would undo the push.
+          const pushX = overlapX / 2 + 0.01
+          const pushY = overlapY / 2 + 0.01
+          const roomX = this.room(a, aSize, b, bSize, pushX, "x", width, height)
+          const roomY = this.room(a, aSize, b, bSize, pushY, "y", width, height)
+          if (roomX && (!roomY || overlapX <= overlapY)) {
+            const direction = a.x <= b.x ? 1 : -1
+            a.x -= pushX * direction
+            b.x += pushX * direction
+            const swap = a.vx
+            a.vx = b.vx
+            b.vx = swap
+          } else if (roomY) {
+            const direction = a.y <= b.y ? 1 : -1
+            a.y -= pushY * direction
+            b.y += pushY * direction
+            const swap = a.vy
+            a.vy = b.vy
+            b.vy = swap
+          }
+        }
+      }
+      if (!collided) break
+    }
+
+    // Pushing apart can shove a meme past an edge, so put it back, and restore
+    // pace because exchanging one axis can leave a meme nearly stopped.
+    for (const actor of this.actors) {
+      const size = this.footprint(actor)
+      actor.x = Math.min(Math.max(0, actor.x), Math.max(0, width - size.width))
+      actor.y = Math.min(Math.max(0, actor.y), Math.max(0, height - size.height))
+
+      const current = Math.hypot(actor.vx, actor.vy)
+      if (current < actor.speed * 0.5) {
+        const angle = this.random() * Math.PI * 2
+        actor.vx = Math.cos(angle) * actor.speed
+        actor.vy = Math.sin(angle) * actor.speed * 0.6
+        continue
+      }
+      const scale = actor.speed / current
+      actor.vx *= scale
+      actor.vy *= scale
+    }
+  }
+
+  /** Would pushing these two apart along `axis` keep both inside the frame? */
+  private room(
+    a: Actor,
+    aSize: { width: number; height: number },
+    b: Actor,
+    bSize: { width: number; height: number },
+    push: number,
+    axis: "x" | "y",
+    width: number,
+    height: number,
+  ) {
+    const limitA = axis === "x" ? width - aSize.width : height - aSize.height
+    const limitB = axis === "x" ? width - bSize.width : height - bSize.height
+    const posA = axis === "x" ? a.x : a.y
+    const posB = axis === "x" ? b.x : b.y
+    const direction = posA <= posB ? 1 : -1
+    const nextA = posA - push * direction
+    const nextB = posB + push * direction
+    return nextA >= 0 && nextA <= limitA && nextB >= 0 && nextB <= limitB
+  }
+
+  private footprint(actor: Actor) {
+    const sprite = memes.sprites[actor.sprite]!
+    return { width: sprite.w, height: sprite.h / 2 }
   }
 
   /** Rebuild every cached frame because the colour they blend against changed. */
@@ -134,26 +240,48 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
   }
 
   private spawn() {
-    const widest = Math.min(WIDEST, this.cells.width)
-    const tallest = Math.min(maxHeight(), this.cells.height)
-    const maxX = Math.max(0, this.cells.width - widest)
-    const maxY = Math.max(0, this.cells.height - tallest)
-
-    this.actors = Array.from({ length: Math.min(MEME_COUNT, SPRITES) }, (_, index) => {
+    this.actors = []
+    // Overlap is geometrically impossible to avoid when the frame is crowded,
+    // so place only as many memes as the area comfortably holds.
+    const budget = Math.floor((this.cells.width * this.cells.height) / (AREA * 2.5))
+    const slots = Math.max(1, Math.min(MEME_COUNT, SPRITES, budget))
+    for (let slot = 0; slot < slots; slot++) {
+      // Round-robin so every supplied meme gets on screen, then randomise.
+      const sprite = slot % SPRITES
+      const size = { width: memes.sprites[sprite]!.w, height: memes.sprites[sprite]!.h / 2 }
+      const maxX = Math.max(0, this.cells.width - size.width)
+      const maxY = Math.max(0, this.cells.height - size.height)
       const angle = this.random() * Math.PI * 2
       const speed = SPEED * (0.6 + this.random() * 0.6)
-      // Round-robin so every supplied meme gets on screen, then randomise.
-      const sprite = index % SPRITES
-      return {
+
+      // Try not to start on top of a meme that is already placed; the drift
+      // separate() pass would sort it out, but a clean start looks deliberate.
+      let x = 0
+      let y = 0
+      for (let attempt = 0; attempt < 50; attempt++) {
+        x = this.random() * maxX
+        y = this.random() * maxY
+        if (this.actors.every((other) => !this.overlaps(other, x, y, size))) break
+      }
+
+      this.actors.push({
         sprite,
-        x: this.random() * maxX,
-        y: this.random() * maxY,
+        x,
+        y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed * 0.6,
+        speed,
         frame: Math.floor(this.random() * memes.sprites[sprite]!.frames.length),
         elapsed: 0,
-      }
-    })
+      })
+    }
+  }
+
+  private overlaps(other: Actor, x: number, y: number, size: { width: number; height: number }) {
+    const otherSize = this.footprint(other)
+    return (
+      x < other.x + otherSize.width && other.x < x + size.width && y < other.y + otherSize.height && other.y < y + size.height
+    )
   }
 
   private advance(actor: Actor, sprite: Sprite, step: number, width: number, height: number) {
@@ -215,9 +343,6 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
   }
 }
 
-function maxHeight() {
-  return Math.max(...memes.sprites.map((sprite) => sprite.h / 2))
-}
 
 /**
  * Split one sprite frame into per-cell foreground/background colours.
