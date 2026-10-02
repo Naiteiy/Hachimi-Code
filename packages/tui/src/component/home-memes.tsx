@@ -11,7 +11,7 @@ import { tint, useTheme } from "../context/theme"
 import memes from "./home-memes/memes.json" with { type: "json" }
 
 /** How many memes drift across the home screen at once. */
-const COUNT = 4
+export const MEME_COUNT = 4
 /** Global alpha of the layer, so the memes read as a watermark behind the prompt. */
 const OPACITY = 0.35
 /** Drift speed in terminal cells per second. */
@@ -22,10 +22,10 @@ const ALPHA_FLOOR = 8
 /** Fallback step when a renderer reports no delta, so animation never stalls. */
 const MIN_STEP = 16
 const TOP_HALF = 0x2580
-const SIZE = memes.size
-const ROWS = SIZE / 2
 const SPRITES = memes.sprites.length
+const WIDEST = Math.max(...memes.sprites.map((sprite) => sprite.w))
 
+type Sprite = (typeof memes.sprites)[number]
 type Painted = { frame: number; base: RGBA; fg: (RGBA | undefined)[]; bg: (RGBA | undefined)[] }
 
 type Actor = {
@@ -69,8 +69,10 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
     if (rest.width !== undefined && typeof rest.width !== "number") this.width = rest.width
     if (rest.height !== undefined && typeof rest.height !== "number") this.height = rest.height
     if (baseColor) this.base = baseColor
-    if (seed !== undefined) this.seedValue = seed
-    if (seed !== undefined) this.random = mulberry32(seed)
+    if (seed !== undefined) {
+      this.seedValue = seed
+      this.random = mulberry32(seed)
+    }
     this.step = fixedStep
   }
 
@@ -109,8 +111,9 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
     // Memes move, so the previous frame has to be wiped or they leave trails.
     frameBuffer.clear()
     for (const actor of this.actors) {
-      this.advance(actor, step, width, height)
-      this.paint(actor, width, height)
+      const sprite = memes.sprites[actor.sprite]!
+      this.advance(actor, sprite, step, width, height)
+      this.paint(actor, sprite, width, height)
     }
 
     super.renderSelf(buffer)
@@ -131,27 +134,31 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
   }
 
   private spawn() {
-    const maxX = Math.max(0, this.cells.width - SIZE)
-    const maxY = Math.max(0, this.cells.height - ROWS)
-    this.actors = Array.from({ length: Math.min(COUNT, SPRITES) }, (_, index) => {
+    const widest = Math.min(WIDEST, this.cells.width)
+    const tallest = Math.min(maxHeight(), this.cells.height)
+    const maxX = Math.max(0, this.cells.width - widest)
+    const maxY = Math.max(0, this.cells.height - tallest)
+
+    this.actors = Array.from({ length: Math.min(MEME_COUNT, SPRITES) }, (_, index) => {
       const angle = this.random() * Math.PI * 2
       const speed = SPEED * (0.6 + this.random() * 0.6)
+      // Round-robin so every supplied meme gets on screen, then randomise.
+      const sprite = index % SPRITES
       return {
-        // Round-robin so every supplied meme gets on screen, then randomise.
-        sprite: index % SPRITES,
+        sprite,
         x: this.random() * maxX,
         y: this.random() * maxY,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed * 0.6,
-        frame: Math.floor(this.random() * memes.sprites[index % SPRITES]!.frames.length),
+        frame: Math.floor(this.random() * memes.sprites[sprite]!.frames.length),
         elapsed: 0,
       }
     })
   }
 
-  private advance(actor: Actor, step: number, width: number, height: number) {
-    const maxX = Math.max(0, width - SIZE)
-    const maxY = Math.max(0, height - ROWS)
+  private advance(actor: Actor, sprite: Sprite, step: number, width: number, height: number) {
+    const maxX = Math.max(0, width - sprite.w)
+    const maxY = Math.max(0, height - sprite.h / 2)
 
     actor.x += (actor.vx * step) / 1000
     actor.y += (actor.vy * step) / 1000
@@ -171,7 +178,7 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
       actor.vy = -Math.abs(actor.vy)
     }
 
-    const frames = memes.sprites[actor.sprite]!.frames
+    const frames = sprite.frames
     actor.elapsed += step
     for (let guard = 0; guard < frames.length; guard++) {
       const current = frames[actor.frame]!
@@ -182,23 +189,23 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
     }
   }
 
-  private paint(actor: Actor, width: number, height: number) {
-    const sprite = memes.sprites[actor.sprite]!
+  private paint(actor: Actor, sprite: Sprite, width: number, height: number) {
     const frame = sprite.frames[actor.frame]!
     if (actor.painted?.frame !== actor.frame || !sameColor(actor.painted.base, this.base)) {
-      actor.painted = { frame: actor.frame, base: this.base, ...blend(frame.px, this.base) }
+      actor.painted = { frame: actor.frame, base: this.base, ...blend(frame.px, sprite.w, sprite.h, this.base) }
     }
 
     const target = this.frameBuffer
+    const rows = sprite.h / 2
     const originX = Math.round(actor.x)
     const originY = Math.round(actor.y)
-    for (let row = 0; row < ROWS; row++) {
+    for (let row = 0; row < rows; row++) {
       const y = originY + row
       if (y < 0 || y >= height) continue
-      for (let column = 0; column < SIZE; column++) {
+      for (let column = 0; column < sprite.w; column++) {
         const x = originX + column
         if (x < 0 || x >= width) continue
-        const cell = row * SIZE + column
+        const cell = row * sprite.w + column
         const fg = actor.painted.fg[cell]
         const bg = actor.painted.bg[cell]
         if (!fg || !bg) continue
@@ -208,24 +215,29 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
   }
 }
 
+function maxHeight() {
+  return Math.max(...memes.sprites.map((sprite) => sprite.h / 2))
+}
+
 /**
  * Split one sprite frame into per-cell foreground/background colours.
  *
  * A cell is one pixel wide and two pixels tall, so it needs the colours of both
  * pixels. Transparent pixels collapse to the theme background, and cells where
- * nothing is visible stay out of the arrays so `paint` skips them and the page
+ * nothing is visible stay undefined so `paint` skips them and the page
  * underneath is left alone.
  */
-function blend(encoded: string, base: RGBA): { fg: (RGBA | undefined)[]; bg: (RGBA | undefined)[] } {
+function blend(encoded: string, width: number, height: number, base: RGBA) {
   const bytes = Buffer.from(encoded, "base64")
-  const fg: (RGBA | undefined)[] = new Array(ROWS * SIZE)
-  const bg: (RGBA | undefined)[] = new Array(ROWS * SIZE)
-  for (let row = 0; row < ROWS; row++) {
-    for (let column = 0; column < SIZE; column++) {
-      const top = pixel(bytes, (row * 2 * SIZE + column) * 4)
-      const bottom = pixel(bytes, ((row * 2 + 1) * SIZE + column) * 4)
+  const rows = height / 2
+  const fg: (RGBA | undefined)[] = new Array(rows * width)
+  const bg: (RGBA | undefined)[] = new Array(rows * width)
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < width; column++) {
+      const top = pixel(bytes, (row * 2 * width + column) * 4)
+      const bottom = pixel(bytes, ((row * 2 + 1) * width + column) * 4)
       if (top.a < ALPHA_FLOOR && bottom.a < ALPHA_FLOOR) continue
-      const cell = row * SIZE + column
+      const cell = row * width + column
       fg[cell] = mix(base, top)
       bg[cell] = mix(base, bottom)
     }

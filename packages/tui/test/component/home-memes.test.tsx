@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { RGBA } from "@opentui/core"
 import { testRender } from "@opentui/solid"
-import { MemeFieldRenderable } from "../../src/component/home-memes"
+import { MEME_COUNT, MemeFieldRenderable } from "../../src/component/home-memes"
+import memes from "../../src/component/home-memes/memes.json"
 
 let setup: Awaited<ReturnType<typeof testRender>> | undefined
 
@@ -13,6 +14,28 @@ afterEach(() => {
 const BASE = RGBA.fromInts(0x17, 0x0f, 0x07)
 // A fixed step keeps the drift and the animation frames reproducible in tests.
 const STEP = 16
+const ALPHA_FLOOR = 8
+
+/**
+ * Upper bound on painted cells: each actor can at most paint the busiest frame
+ * of its sprite. Cells accumulate beyond this only if the layer forgets to
+ * clear, which is exactly the trailing bug this guards against.
+ */
+const BUDGET = memes.sprites.slice(0, MEME_COUNT).reduce((total, sprite) => {
+  const perFrame = sprite.frames.map((frame) => {
+    const bytes = Buffer.from(frame.px, "base64")
+    let cells = 0
+    for (let row = 0; row < sprite.h / 2; row++) {
+      for (let column = 0; column < sprite.w; column++) {
+        const top = bytes[(row * 2 * sprite.w + column) * 4 + 3]!
+        const bottom = bytes[((row * 2 + 1) * sprite.w + column) * 4 + 3]!
+        if (top >= ALPHA_FLOOR || bottom >= ALPHA_FLOOR) cells++
+      }
+    }
+    return cells
+  })
+  return total + Math.max(...perFrame)
+}, 0)
 
 async function mount(seed: number, width = 60, height = 20) {
   setup = await testRender(
@@ -23,10 +46,15 @@ async function mount(seed: number, width = 60, height = 20) {
   return setup
 }
 
+function painted(frame: string) {
+  return frame.split("").filter((char) => char === "\u2580").length
+}
+
 describe("home meme field", () => {
   test("paints half-block pixels onto the home layer", async () => {
     const frame = (await mount(7)).captureCharFrame()
     expect(frame).toContain("\u2580")
+    expect(painted(frame)).toBeGreaterThan(50)
   })
 
   test("is reproducible for a given seed", async () => {
@@ -50,18 +78,12 @@ describe("home meme field", () => {
     expect(field.captureCharFrame()).not.toBe(first)
   })
 
-  test("leaves no trails where a meme has moved away from", async () => {
+  test("never paints more than the sprites can occupy", async () => {
     const field = await mount(9)
-    const seen = new Set<string>()
-    for (let index = 0; index < 40; index++) {
+    for (let index = 0; index < 120; index++) {
       await field.renderOnce()
-      const lines = field.captureCharFrame().replace(/\n$/, "").split("\n")
-      // A single meme is 24 cells wide, so no row may exceed that plus the two
-      // others that may share it. Anything wider means cells were never cleared.
-      expect(Math.max(...lines.map((line) => line.trimEnd().length))).toBeLessThanOrEqual(72)
-      seen.add(lines.join("\n"))
+      expect(painted(field.captureCharFrame())).toBeLessThanOrEqual(BUDGET)
     }
-    expect(seen.size).toBeGreaterThan(1)
   })
 
   test("stays within the terminal bounds", async () => {

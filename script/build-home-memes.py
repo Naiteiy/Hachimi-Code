@@ -2,10 +2,14 @@
 """Convert meme images (GIF/PNG) into terminal sprites for the TUI home screen.
 
 `@opentui/core` 0.4.5 has no image renderable, so real pictures cannot be drawn
-directly. This script decodes them ahead of time, downsamples each frame to a
-small RGBA grid, and emits base64 frames that `home-memes.tsx` paints with
-half-block characters (one cell = 1px wide x 2px tall, which keeps pixels square
-because terminal cells are roughly twice as tall as they are wide).
+directly. This script decodes them ahead of time, downsamples each frame, and
+emits base64 frames that `home-memes.tsx` paints with half-block characters (one
+cell = 1px wide x 2px tall, which keeps pixels square because terminal cells are
+roughly twice as tall as they are wide).
+
+Sprites keep the source aspect ratio instead of being forced into a square: the
+characters are tall and narrow, so a square canvas would spend most of its
+pixels on transparent side margins.
 
 Requires Pillow (already installed; else `pip3 install --user pillow`).
 Run from the repo root:
@@ -29,6 +33,8 @@ from PIL import Image, ImageChops, ImageSequence
 
 # Pixels within this luminance distance of the detected background are keyed out.
 BG_TOLERANCE = 34
+# Keeps one freak aspect ratio from producing an unusably wide sprite.
+MAX_WIDTH = 56
 
 
 def detect_background(frame: Image.Image) -> tuple[int, int, int] | None:
@@ -82,8 +88,7 @@ def union_box(frames: list[Image.Image], threshold: int = 8) -> tuple[int, int, 
     """Bounding box covering the visible pixels of every frame.
 
     Cropping to the shared box (rather than per frame) reclaims the empty margin
-    these cutout sprites carry, which at 20px is most of the sprite, while
-    keeping the animation from jittering.
+    these cutout sprites carry while keeping the animation from jittering.
     """
     box = None
     for frame in frames:
@@ -99,14 +104,23 @@ def union_box(frames: list[Image.Image], threshold: int = 8) -> tuple[int, int, 
     return box
 
 
-def fit(frame: Image.Image, box: tuple[int, int, int, int], size: int) -> Image.Image:
-    """Crop to box, scale to fit size x size preserving aspect, centre on a transparent canvas."""
+def sprite_size(box: tuple[int, int, int, int], height: int) -> tuple[int, int]:
+    """Pick the sprite grid: requested height, width from the source aspect.
+
+    Height is forced even because one cell carries two vertically stacked pixels.
+    """
+    aspect = (box[2] - box[0]) / max(1, box[3] - box[1])
+    tall = height + (height % 2)
+    return (max(2, min(MAX_WIDTH, round(tall * aspect))), tall)
+
+
+def fit(frame: Image.Image, box: tuple[int, int, int, int], target: tuple[int, int]) -> Image.Image:
+    """Crop to box, scale into target preserving aspect, centre on a transparent canvas."""
     cropped = frame.crop(box)
-    ratio = min(size / cropped.width, size / cropped.height)
-    target = (max(1, round(cropped.width * ratio)), max(1, round(cropped.height * ratio)))
-    sprite = downsample(cropped, target)
-    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    canvas.paste(sprite, ((size - target[0]) // 2, (size - target[1]) // 2))
+    ratio = min(target[0] / cropped.width, target[1] / cropped.height)
+    scaled = (max(1, round(cropped.width * ratio)), max(1, round(cropped.height * ratio)))
+    canvas = Image.new("RGBA", target, (0, 0, 0, 0))
+    canvas.paste(downsample(cropped, scaled), ((target[0] - scaled[0]) // 2, (target[1] - scaled[1]) // 2))
     return canvas
 
 
@@ -129,9 +143,19 @@ def decode(path: str) -> tuple[list[Image.Image], list[int]]:
     return frames, durations
 
 
-def encode(frames: list[Image.Image], durations: list[int], size: int) -> list[tuple[str, int]]:
+def encode(path: str, height: int, max_frames: int) -> dict:
+    frames, durations = decode(path)
     box = union_box(frames) or (0, 0, frames[0].width, frames[0].height)
-    return [(base64.b64encode(fit(frame, box, size).tobytes()).decode("ascii"), ms) for frame, ms in zip(frames, durations)]
+    width, tall = sprite_size(box, height)
+    encoded = [(base64.b64encode(fit(frame, box, (width, tall)).tobytes()).decode("ascii"), ms) for frame, ms in zip(frames, durations)]
+    kept = thin(encoded, max_frames)
+    return {
+        "name": os.path.splitext(os.path.basename(path))[0],
+        "w": width,
+        "h": tall,
+        "frames": [{"px": pixels, "ms": ms} for pixels, ms in kept],
+        "decoded": len(frames),
+    }
 
 
 def thin(frames: list[tuple[str, int]], max_frames: int) -> list[tuple[str, int]]:
@@ -150,8 +174,9 @@ def thin(frames: list[tuple[str, int]], max_frames: int) -> list[tuple[str, int]
     return out
 
 
-def preview(sprite: dict, size: int, background: tuple[int, int, int] = (0x17, 0x0F, 0x07)) -> None:
+def preview(sprite: dict, background: tuple[int, int, int] = (0x17, 0x0F, 0x07)) -> None:
     """Print one frame as ANSI half blocks, composited over the theme background."""
+    width, height = sprite["w"], sprite["h"]
     frame = base64.b64decode(sprite["frames"][len(sprite["frames"]) // 2]["px"])
 
     def blend(index: int) -> tuple[int, int, int]:
@@ -159,11 +184,11 @@ def preview(sprite: dict, size: int, background: tuple[int, int, int] = (0x17, 0
         t = a / 255
         return tuple(round(c * t + back * (1 - t)) for c, back in zip((r, g, b), background))
 
-    print(f"\n  {sprite['name']}  ({len(sprite['frames'])} frames, {size}x{size} px)")
-    for y in range(0, size, 2):
+    print(f"\n  {sprite['name']}  ({len(sprite['frames'])} frames, {width}x{height} px)")
+    for y in range(0, height, 2):
         row = ""
-        for x in range(size):
-            top, bottom = blend(y * size + x), blend((y + 1) * size + x)
+        for x in range(width):
+            top, bottom = blend(y * width + x), blend((y + 1) * width + x)
             row += f"\x1b[38;2;{top[0]};{top[1]};{top[2]}m\x1b[48;2;{bottom[0]};{bottom[1]};{bottom[2]}m\u2580"
         print("  " + row + "\x1b[0m")
 
@@ -172,8 +197,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("images", nargs="+", help="source GIF/PNG files, in display order")
     parser.add_argument("--out", required=True, help="output JSON path")
-    parser.add_argument("--size", type=int, default=20, help="sprite size in pixels (default 20)")
-    parser.add_argument("--max-frames", type=int, default=20, help="frame cap per sprite (default 20)")
+    parser.add_argument("--height", type=int, default=40, help="sprite height in pixels (default 40)")
+    parser.add_argument("--max-frames", type=int, default=16, help="frame cap per sprite (default 16)")
     parser.add_argument("--preview", type=int, help="print an ANSI preview of this sprite index and exit")
     args = parser.parse_args()
 
@@ -181,23 +206,17 @@ def main() -> None:
     for path in args.images:
         if not os.path.exists(path):
             raise SystemExit(f"{path}: not found")
-        frames, durations = decode(path)
-        kept = thin(encode(frames, durations, args.size), args.max_frames)
-        sprites.append(
-            {
-                "name": os.path.splitext(os.path.basename(path))[0],
-                "frames": [{"px": pixels, "ms": ms} for pixels, ms in kept],
-            }
-        )
-        print(f"{path}: {len(frames)} decoded -> {len(kept)} frames kept")
+        sprite = encode(path, args.height, args.max_frames)
+        print(f"{path}: {sprite.pop('decoded')} decoded -> {len(sprite['frames'])} frames, {sprite['w']}x{sprite['h']} px")
+        sprites.append(sprite)
 
     if args.preview is not None:
-        preview(sprites[args.preview], args.size)
+        preview(sprites[args.preview])
         return
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w") as handle:
-        json.dump({"size": args.size, "sprites": sprites}, handle, separators=(",", ":"))
+        json.dump({"sprites": sprites}, handle, separators=(",", ":"))
     print(f"\nwrote {args.out} ({os.path.getsize(args.out) / 1024:.0f} KB, {len(sprites)} sprites)")
 
 
