@@ -191,20 +191,62 @@ it.effect("Cohere thinking budgets must be positive integers", () =>
   }),
 )
 
-it.effect("Cohere authentication errors are non-retryable", () =>
-  Effect.gen(function* () {
-    const error = yield* LLMClient.generate(
-      LLM.request({ model: cohere.model("command-a-03-2025"), prompt: "Hi" }),
-    ).pipe(
-      Effect.provide(
-        fixedResponse('{"message":"invalid api token"}', {
-          status: 401,
-          headers: { "content-type": "application/json" },
-        }),
-      ),
-      Effect.flip,
-    )
-    expect(error.reason._tag).toBe("Authentication")
-    expect(isRetryable(error)).toBe(false)
-  }),
+// Bodies captured live on 2026-10-02, except 402 and 429, which are Cohere's documented messages.
+const errors = [
+  { status: 401, message: "Incorrect API key provided: ***-123.", tag: "Authentication", retry: false },
+  { status: 404, message: "model 'no-such-model-xyz' not found", tag: "InvalidRequest", retry: false },
+  {
+    status: 400,
+    message: "invalid request: temperature must be between 0 and 2.0 inclusive.",
+    tag: "InvalidRequest",
+    retry: false,
+  },
+  {
+    status: 400,
+    error_type: "TOO_MANY_TOKENS",
+    message: "too many tokens: size limit exceeded by 168512 tokens. The limit for this model is 132000 tokens.",
+    tag: "InvalidRequest",
+    classification: "context-overflow",
+    retry: false,
+  },
+  {
+    status: 400,
+    error_type: "TOO_MANY_TOKENS",
+    message:
+      "too many tokens: max tokens must be less than or equal to 4096, the maximum output length for this model - received 1000000.",
+    tag: "InvalidRequest",
+    retry: false,
+  },
+  { status: 402, message: "Please add or update your payment method to continue", tag: "QuotaExceeded", retry: false },
+  {
+    status: 429,
+    message: "You are using a Trial key, which is limited to 40 API calls / minute.",
+    tag: "RateLimit",
+    retry: true,
+  },
+  { status: 500, message: "internal server error", tag: "ProviderInternal", retry: true },
+]
+
+it.effect("Cohere HTTP errors map to AI error reasons", () =>
+  Effect.forEach(errors, (item) =>
+    Effect.gen(function* () {
+      const error = yield* LLMClient.generate(
+        LLM.request({ model: cohere.model("command-a-03-2025"), prompt: "Hi" }),
+      ).pipe(
+        Effect.provide(
+          fixedResponse(JSON.stringify({ id: "fixture", error_type: item.error_type, message: item.message }), {
+            status: item.status,
+            headers: { "content-type": "application/json" },
+          }),
+        ),
+        Effect.flip,
+      )
+      expect({
+        message: error.message,
+        tag: error.reason._tag,
+        classification: error.reason._tag === "InvalidRequest" ? error.reason.classification : undefined,
+        retry: isRetryable(error),
+      }).toEqual({ message: item.message, tag: item.tag, classification: item.classification, retry: item.retry })
+    }),
+  ),
 )
