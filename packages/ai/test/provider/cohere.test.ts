@@ -191,6 +191,20 @@ it.effect("Cohere thinking budgets must be positive integers", () =>
   }),
 )
 
+it.effect("Cohere fits thinking budgets under the output limit", () =>
+  Effect.gen(function* () {
+    const prepared = yield* compileRequest(
+      LLM.request({
+        model: cohere.model("command-a-reasoning-08-2025"),
+        prompt: "Hi",
+        providerOptions: { thinking: { tokenBudget: 31_999 } },
+        generation: { maxTokens: 4096 },
+      }),
+    )
+    expect(prepared.body.thinking).toEqual({ type: "enabled", token_budget: 2048 })
+  }),
+)
+
 // Bodies captured live on 2026-10-02, except 402 and 429, which are Cohere's documented messages.
 const errors = [
   { status: 401, message: "Incorrect API key provided: ***-123.", tag: "Authentication", retry: false },

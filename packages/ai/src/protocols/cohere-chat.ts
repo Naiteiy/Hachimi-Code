@@ -198,7 +198,11 @@ const fromRequest = Effect.fn("CohereChat.fromRequest")(function* (request: LLMR
     tool_choice: TOOL_CHOICE[request.toolChoice?.type ?? "auto"],
     thinking: options.thinking && {
       type: options.thinking.type ?? "enabled",
-      token_budget: options.thinking.tokenBudget,
+      // Cohere rejects budgets above max_tokens; fitting also leaves room for the answer.
+      token_budget:
+        options.thinking.tokenBudget === undefined
+          ? undefined
+          : ProviderShared.fitThinkingBudget(options.thinking.tokenBudget, request.generation?.maxTokens),
     },
     max_tokens: request.generation?.maxTokens,
     temperature: request.generation?.temperature,
