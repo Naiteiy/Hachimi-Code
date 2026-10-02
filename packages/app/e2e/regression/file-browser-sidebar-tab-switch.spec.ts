@@ -1,9 +1,9 @@
 import { base64Encode } from "@hachimi-code/core/util/encode"
 import { expect, test, type Page } from "@playwright/test"
-import { mockOpenCodeServer } from "../utils/mock-server"
+import { mockHachimiCodeServer } from "../utils/mock-server"
 import { expectSessionTitle } from "../utils/waits"
 
-const directory = "C:/OpenCode/FileBrowserSidebar"
+const directory = "C:/HACHIMI CODE/FileBrowserSidebar"
 const projectID = "proj_file_browser_sidebar"
 const sessionID = "ses_file_browser_sidebar"
 const title = "File browser sidebar"
@@ -111,7 +111,7 @@ async function setup(
   page: Page,
   findFiles?: (input: { query: string; dirs?: string; limit?: number }) => unknown | Promise<unknown>,
 ) {
-  await mockOpenCodeServer(page, {
+  await mockHachimiCodeServer(page, {
     directory,
     project: {
       id: projectID,
@@ -125,7 +125,7 @@ async function setup(
       all: [
         {
           id: "opencode",
-          name: "OpenCode",
+          name: "HACHIMI CODE",
           models: { test: { id: "test", name: "Test", limit: { context: 200_000 } } },
         },
       ],

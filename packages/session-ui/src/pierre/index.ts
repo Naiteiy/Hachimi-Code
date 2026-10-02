@@ -187,7 +187,7 @@ ${lineCommentStyles}
 
 export function createDefaultOptions<T>(style: FileDiffOptions<T>["diffStyle"]) {
   return {
-    theme: "OpenCode",
+    theme: "HACHIMI CODE",
     themeType: "system",
     disableLineNumbers: false,
     overflow: "wrap",

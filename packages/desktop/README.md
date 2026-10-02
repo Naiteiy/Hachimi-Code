@@ -1,6 +1,6 @@
-# OpenCode Desktop
+# HACHIMI CODE Desktop
 
-The OpenCode Desktop app, built with Electron.
+The HACHIMI CODE Desktop app, built with Electron.
 
 ## Development
 

@@ -1,4 +1,4 @@
-import type { OpenCodeEventEncoded } from "@hachimi-code/protocol/groups/event"
+import type { HachimiCodeEventEncoded } from "@hachimi-code/protocol/groups/event"
 
 export type JsonValue =
   | null
@@ -2538,7 +2538,7 @@ export type SkillsListOutput = {
   }>
 }
 
-export type EventsSubscribeOutput = OpenCodeEventEncoded
+export type EventsSubscribeOutput = HachimiCodeEventEncoded
 
 export type PtysListInput = {
   readonly location?: {

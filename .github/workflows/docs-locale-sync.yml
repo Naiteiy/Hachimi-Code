@@ -48,11 +48,11 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Install OpenCode
+      - name: Install HACHIMI CODE
         if: steps.changes.outputs.has_changes == 'true'
         run: curl -fsSL https://opencode.ai/install | bash
 
-      - name: Sync locale docs with OpenCode
+      - name: Sync locale docs with HACHIMI CODE
         if: steps.changes.outputs.has_changes == 'true'
         env:
           HACHIMICODE_API_KEY: ${{ secrets.HACHIMICODE_API_KEY }}

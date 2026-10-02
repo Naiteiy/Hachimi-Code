@@ -1,9 +1,9 @@
 import { base64Encode } from "@hachimi-code/core/util/encode"
 import { expect, test, type Page } from "@playwright/test"
-import { mockOpenCodeServer } from "../utils/mock-server"
+import { mockHachimiCodeServer } from "../utils/mock-server"
 import { expectSessionTitle } from "../utils/waits"
 
-const directory = "C:/OpenCode/ReviewStatePersistence"
+const directory = "C:/HACHIMI CODE/ReviewStatePersistence"
 const projectID = "proj_review_state_persistence"
 const sessionA = "ses_review_state_a"
 const sessionB = "ses_review_state_b"
@@ -64,7 +64,7 @@ async function switchSession(page: Page, title: string) {
 }
 
 async function setup(page: Page) {
-  await mockOpenCodeServer(page, {
+  await mockHachimiCodeServer(page, {
     protocol: "v1",
     directory,
     project: {
@@ -79,7 +79,7 @@ async function setup(page: Page) {
       all: [
         {
           id: "opencode",
-          name: "OpenCode",
+          name: "HACHIMI CODE",
           models: { test: { id: "test", name: "Test", limit: { context: 200_000 } } },
         },
       ],

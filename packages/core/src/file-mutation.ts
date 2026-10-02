@@ -68,7 +68,7 @@ export class Service extends Context.Service<Service, Interface>()("@hachimi-cod
 
 /**
  * Serialize file changes by canonical target. Conditional writes compare and
- * write under the same process-local lock so cooperating OpenCode mutations do
+ * write under the same process-local lock so cooperating HACHIMI CODE mutations do
  * not overwrite changes made from the same stale content.
  */
 const layer = Layer.effect(

@@ -36,13 +36,13 @@ export const collectOpenProjectDeepLinks = (urls: string[]) =>
 export const collectNewSessionDeepLinks = (urls: string[]) =>
   urls.map(parseNewSessionDeepLink).filter((link): link is { directory: string; prompt?: string } => !!link)
 
-type OpenCodeWindow = Window & {
+type HACHIMI CODEWindow = Window & {
   __HACHIMICODE__?: {
     deepLinks?: string[]
   }
 }
 
-export const drainPendingDeepLinks = (target: OpenCodeWindow) => {
+export const drainPendingDeepLinks = (target: HACHIMI CODEWindow) => {
   const pending = target.__HACHIMICODE__?.deepLinks ?? []
   if (pending.length === 0) return []
   if (target.__HACHIMICODE__) target.__HACHIMICODE__.deepLinks = []

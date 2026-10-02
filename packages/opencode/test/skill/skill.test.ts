@@ -513,7 +513,7 @@ name: opencode-skill
 description: A skill in the .hachimicode/skill directory.
 ---
 
-# OpenCode Skill
+# HACHIMI CODE Skill
 `,
               ),
             ]),
@@ -560,7 +560,7 @@ name: opencode-skill
 description: A skill in the .hachimicode/skill directory.
 ---
 
-# OpenCode Skill
+# HACHIMI CODE Skill
 `,
               ),
               Bun.write(
@@ -570,7 +570,7 @@ name: opencode-skill
 description: A skill in the .hachimicode/skills directory.
 ---
 
-# OpenCode Skill
+# HACHIMI CODE Skill
 `,
               ),
             ]),

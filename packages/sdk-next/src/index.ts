@@ -1,4 +1,4 @@
-export * as OpenCode from "./opencode"
+export * as HACHIMI CODE from "./opencode"
 export * as Tool from "./tool"
 
 export { ClientError } from "@hachimi-code/client/effect"
@@ -14,4 +14,4 @@ export {
   SessionInput,
   SessionMessage,
 } from "@hachimi-code/client/effect"
-export type { OpenCodeEvent } from "@hachimi-code/client/effect"
+export type { HachimiCodeEvent } from "@hachimi-code/client/effect"

@@ -134,7 +134,7 @@ export function Header(props: { githubStars: string; links?: readonly HeaderLink
             <span>[{props.githubStars}]</span>
           </a>
           <a data-slot="header-button" data-variant="contrast" href="https://opencode.ai/">
-            <strong>{i18n.t("header.tryOpenCode")}</strong>
+            <strong>{i18n.t("header.tryHachimiCode")}</strong>
           </a>
           <button
             data-slot="menu-button"
@@ -203,7 +203,7 @@ function DataWordmark() {
   )
 }
 
-function OpenCodeMark() {
+function HACHIMI CODEMark() {
   return (
     <svg data-slot="opencode-mark" width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
       <path d="M40 40H0V0H40V40Z" fill="var(--stats-logo-bg)" />
@@ -254,7 +254,7 @@ export function Footer(props: {
       <Show when={bridge()}>{(link) => <SectionBridge label={link().label} href={link().href} />}</Show>
       <div data-slot="footer-grid">
         <a data-slot="footer-mark" href="https://opencode.ai" aria-label={i18n.t("footer.homeAria")}>
-          <OpenCodeMark />
+          <HACHIMI CODEMark />
         </a>
         <FooterColumn title={i18n.t("footer.modelData")} links={modelStats} localHref={localHref} />
         <FooterColumn title={i18n.t("footer.legal")} links={legal} localHref={localHref} />
@@ -435,7 +435,7 @@ function SubscribeModal(props: { onClose: () => void }) {
       <div data-slot="modal-scrim" aria-hidden="true" onClick={props.onClose} />
       <div data-slot="modal-panel">
         <div data-slot="modal-brand">
-          <img data-slot="modal-logo" src={opencodeWordmarkDark} alt="OpenCode" />
+          <img data-slot="modal-logo" src={opencodeWordmarkDark} alt="HACHIMI CODE" />
           <button
             data-slot="modal-close"
             type="button"

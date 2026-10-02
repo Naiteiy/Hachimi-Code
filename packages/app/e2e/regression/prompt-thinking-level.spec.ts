@@ -1,14 +1,14 @@
 import { expect, test, type Page } from "@playwright/test"
 import { base64Encode } from "@hachimi-code/core/util/encode"
-import { mockOpenCodeServer } from "../utils/mock-server"
+import { mockHachimiCodeServer } from "../utils/mock-server"
 import { expectAppVisible } from "../utils/waits"
 
-const directory = "C:/OpenCode/PromptThinkingLevelRegression"
+const directory = "C:/HACHIMI CODE/PromptThinkingLevelRegression"
 const projectID = "proj_prompt_thinking_level_regression"
 const sessionID = "ses_prompt_thinking_level_regression"
 
 test("shows the V2 thinking level control while relevant", async ({ page }) => {
-  await mockOpenCodeServer(page, {
+  await mockHachimiCodeServer(page, {
     directory,
     project: {
       id: projectID,
@@ -22,7 +22,7 @@ test("shows the V2 thinking level control while relevant", async ({ page }) => {
       all: [
         {
           id: "opencode",
-          name: "OpenCode",
+          name: "HACHIMI CODE",
           models: {
             "thinking-model": {
               id: "thinking-model",

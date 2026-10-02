@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { adaptServerEvent, coalesceServerEvents, enqueueServerEvent, resumeStreamAfterPageShow } from "./server-sdk"
-import type { OpenCodeEvent } from "@hachimi-code/client/promise"
+import type { HachimiCodeEvent } from "@hachimi-code/client/promise"
 import type { Event } from "@hachimi-code/sdk/v2/client"
 
 describe("resumeStreamAfterPageShow", () => {
@@ -22,7 +22,7 @@ describe("adaptServerEvent", () => {
       created: 1,
       type: "permission.v2.asked",
       data: { id: "perm_1", sessionID: "ses_1", action: "read", resources: ["src/**"] },
-    } as OpenCodeEvent
+    } as HachimiCodeEvent
 
     expect(adaptServerEvent(current)).toMatchObject({
       type: "permission.asked",
@@ -60,7 +60,7 @@ describe("coalesceServerEvents", () => {
         type: "session.text.delta",
         location: { directory: "/repo" },
         data: { sessionID: "ses", assistantMessageID: "msg", ordinal: 0, delta: value },
-      } as OpenCodeEvent)
+      } as HachimiCodeEvent)
     const result = coalesceServerEvents([
       { directory: "/repo", payload: current("evt_1", "hello ") },
       { directory: "/repo", payload: current("evt_2", "world") },

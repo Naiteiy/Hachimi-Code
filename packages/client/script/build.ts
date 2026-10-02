@@ -13,8 +13,8 @@ await Effect.runPromise(
         emitPromise(contract, {
           outputTypes: {
             "events.subscribe": {
-              name: "OpenCodeEventEncoded",
-              import: 'import type { OpenCodeEventEncoded } from "@hachimi-code/protocol/groups/event"',
+              name: "HachimiCodeEventEncoded",
+              import: 'import type { HachimiCodeEventEncoded } from "@hachimi-code/protocol/groups/event"',
             },
           },
         }),

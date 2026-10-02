@@ -2132,7 +2132,7 @@ test("parseManagedPlist strips MDM metadata keys", async () => {
     ConfigParse.jsonc(
       await ConfigManaged.parseManagedPlist(
         JSON.stringify({
-          PayloadDisplayName: "OpenCode Managed",
+          PayloadDisplayName: "HACHIMI CODE Managed",
           PayloadIdentifier: "ai.opencode.managed.test",
           PayloadType: "ai.opencode.managed",
           PayloadUUID: "AAAA-BBBB-CCCC",

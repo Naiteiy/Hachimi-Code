@@ -1,7 +1,7 @@
 import { usePlatform } from "@/context/platform"
 import { ServerConnection } from "@/context/server"
 import { authTokenFromCredentials, createSdkForServer } from "./server"
-import { ClientError, OpenCode } from "@hachimi-code/client"
+import { ClientError, HACHIMI CODE } from "@hachimi-code/client"
 import { Accessor, createEffect, onCleanup } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 
@@ -85,7 +85,7 @@ export async function checkServerHealth(
       .catch(() => ({ healthy: false }))
   }
   const attempt = async (count: number): Promise<ServerHealth> => {
-    const current = await OpenCode.make({
+    const current = await HACHIMI CODE.make({
       baseUrl: server.url,
       fetch,
       headers: server.password

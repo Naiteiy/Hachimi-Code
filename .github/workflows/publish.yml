@@ -49,7 +49,7 @@ jobs:
           opencode-app-id: ${{ vars.HACHIMICODE_APP_ID }}
           opencode-app-secret: ${{ secrets.HACHIMICODE_APP_SECRET }}
 
-      - name: Install OpenCode
+      - name: Install HACHIMI CODE
         if: inputs.bump || inputs.version
         run: bun i -g opencode-ai
 

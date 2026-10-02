@@ -1,6 +1,6 @@
 # @hachimi-code/client
 
-Private generation target for clients derived directly from OpenCode's authoritative Effect `HttpApi`.
+Private generation target for clients derived directly from HACHIMI CODE's authoritative Effect `HttpApi`.
 
 ## Entrypoints
 
@@ -16,9 +16,9 @@ The Promise root remains structural and has no Core or Effect runtime dependency
 Effect consumers construct canonical decoded inputs:
 
 ```ts
-import { AbsolutePath, Location, OpenCode, Prompt } from "@hachimi-code/client/effect"
+import { AbsolutePath, Location, HACHIMI CODE, Prompt } from "@hachimi-code/client/effect"
 
-const client = yield * OpenCode.make({ baseUrl: "https://opencode.example" })
+const client = yield * HACHIMI CODE.make({ baseUrl: "https://opencode.example" })
 yield *
   client.sessions.create({
     location: Location.Ref.make({ directory: AbsolutePath.make("/workspace") }),
