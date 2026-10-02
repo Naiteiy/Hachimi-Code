@@ -112,7 +112,7 @@ export default function Home() {
                     <button data-copy data-slot="command" onClick={handleCopyClick}>
                       <span>
                         <span data-slot="protocol">npm install -g </span>
-                        <span data-slot="highlight">@opencode/cli</span>
+                        <span data-slot="highlight">@hachimi-code/cli</span>
                       </span>
                       <CopyStatus />
                     </button>
@@ -121,7 +121,7 @@ export default function Home() {
                     <button data-copy data-slot="command" onClick={handleCopyClick}>
                       <span>
                         <span data-slot="protocol">bun install -g --trust </span>
-                        <span data-slot="highlight">@opencode/cli</span>
+                        <span data-slot="highlight">@hachimi-code/cli</span>
                       </span>
                       <CopyStatus />
                     </button>

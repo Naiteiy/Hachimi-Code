@@ -57,9 +57,9 @@ OpenCode Desktop は、ローカル OpenCode サーバー (`opencode-cli` サイ
 
 グローバル設定ファイルを開き、`plugin` キーを探します。
 
-- **macOS/Linux**: `~/.config/opencode/opencode.jsonc` (または `~/.config/opencode/opencode.json`)
-- **macOS/Linux** (古いインストール): `~/.local/share/opencode/opencode.jsonc`
-- **Windows**: `WIN+R` を押して `%USERPROFILE%\.config\opencode\opencode.jsonc` を貼り付けます
+- **macOS/Linux**: `~/.config/opencode/hachimicode.jsonc` (または `~/.config/opencode/hachimicode.json`)
+- **macOS/Linux** (古いインストール): `~/.local/share/opencode/hachimicode.jsonc`
+- **Windows**: `WIN+R` を押して `%USERPROFILE%\.config\opencode\hachimicode.jsonc` を貼り付けます
 
 プラグインを構成している場合は、キーを削除するか空の配列に設定して、プラグインを一時的に無効にします。
 
@@ -78,7 +78,7 @@ OpenCode はディスクからローカルプラグインをロードするこ�
   - **macOS/Linux**: `~/.config/opencode/plugins/`
   - **Windows**: `WIN+R` を押して `%USERPROFILE%\.config\opencode\plugins` を貼り付けます
 - **プロジェクトプラグイン** (プロジェクトごとの構成を使用する場合のみ)
-  - `<your-project>/.opencode/plugins/`
+  - `<your-project>/.hachimicode/plugins/`
 
 アプリが再び動作し始めた場合は、プラグインを 1 つずつ再度有効にして、問題の原因となっているプラ​​グインを特定します。
 
@@ -111,13 +111,13 @@ OpenCode Desktop は、独自のローカルサーバー (デフォルト) を�
 
 #### 設定から `server.port` / `server.hostname` を削除します
 
-`opencode.json(c)` に `server` セクションが含まれている場合は、それを一時的に削除し、デスクトップアプリを再起動します。
+`hachimicode.json(c)` に `server` セクションが含まれている場合は、それを一時的に削除し、デスクトップアプリを再起動します。
 
 #### 環境変数を確認する
 
-環境に `OPENCODE_PORT` が設定されている場合、デスクトップアプリはローカルサーバーにそのポートを使用しようとします。
+環境に `HACHIMICODE_PORT` が設定されている場合、デスクトップアプリはローカルサーバーにそのポートを使用しようとします。
 
-- `OPENCODE_PORT` の設定を解除して (または空きポートを選択して)、再起動します。
+- `HACHIMICODE_PORT` の設定を解除して (または空きポートを選択して)、再起動します。
 
 ---
 

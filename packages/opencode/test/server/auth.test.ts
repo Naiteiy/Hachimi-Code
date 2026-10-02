@@ -4,27 +4,27 @@ import { Flag } from "@hachimi-code/core/flag/flag"
 import { ServerAuth } from "../../src/server/auth"
 
 const original = {
-  OPENCODE_SERVER_PASSWORD: Flag.OPENCODE_SERVER_PASSWORD,
-  OPENCODE_SERVER_USERNAME: Flag.OPENCODE_SERVER_USERNAME,
+  HACHIMICODE_SERVER_PASSWORD: Flag.HACHIMICODE_SERVER_PASSWORD,
+  HACHIMICODE_SERVER_USERNAME: Flag.HACHIMICODE_SERVER_USERNAME,
 }
 
 afterEach(() => {
-  Flag.OPENCODE_SERVER_PASSWORD = original.OPENCODE_SERVER_PASSWORD
-  Flag.OPENCODE_SERVER_USERNAME = original.OPENCODE_SERVER_USERNAME
+  Flag.HACHIMICODE_SERVER_PASSWORD = original.HACHIMICODE_SERVER_PASSWORD
+  Flag.HACHIMICODE_SERVER_USERNAME = original.HACHIMICODE_SERVER_USERNAME
 })
 
 describe("ServerAuth", () => {
   test("does not emit auth headers without a password", () => {
-    Flag.OPENCODE_SERVER_PASSWORD = undefined
-    Flag.OPENCODE_SERVER_USERNAME = "alice"
+    Flag.HACHIMICODE_SERVER_PASSWORD = undefined
+    Flag.HACHIMICODE_SERVER_USERNAME = "alice"
 
     expect(ServerAuth.header()).toBeUndefined()
     expect(ServerAuth.headers()).toBeUndefined()
   })
 
   test("defaults to the opencode username", () => {
-    Flag.OPENCODE_SERVER_PASSWORD = "secret"
-    Flag.OPENCODE_SERVER_USERNAME = undefined
+    Flag.HACHIMICODE_SERVER_PASSWORD = "secret"
+    Flag.HACHIMICODE_SERVER_USERNAME = undefined
 
     expect(ServerAuth.headers()).toEqual({
       Authorization: `Basic ${Buffer.from("opencode:secret").toString("base64")}`,
@@ -32,8 +32,8 @@ describe("ServerAuth", () => {
   })
 
   test("uses the configured username", () => {
-    Flag.OPENCODE_SERVER_PASSWORD = "secret"
-    Flag.OPENCODE_SERVER_USERNAME = "alice"
+    Flag.HACHIMICODE_SERVER_PASSWORD = "secret"
+    Flag.HACHIMICODE_SERVER_USERNAME = "alice"
 
     expect(ServerAuth.headers()).toEqual({
       Authorization: `Basic ${Buffer.from("alice:secret").toString("base64")}`,
@@ -41,8 +41,8 @@ describe("ServerAuth", () => {
   })
 
   test("prefers explicit credentials", () => {
-    Flag.OPENCODE_SERVER_PASSWORD = "secret"
-    Flag.OPENCODE_SERVER_USERNAME = "alice"
+    Flag.HACHIMICODE_SERVER_PASSWORD = "secret"
+    Flag.HACHIMICODE_SERVER_USERNAME = "alice"
 
     expect(ServerAuth.headers({ password: "cli-secret", username: "bob" })).toEqual({
       Authorization: `Basic ${Buffer.from("bob:cli-secret").toString("base64")}`,

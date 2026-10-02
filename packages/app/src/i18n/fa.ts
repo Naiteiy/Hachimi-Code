@@ -393,7 +393,7 @@ export const dict = {
   "dialog.mcp.description": "{{enabled}} از {{total}} فعال است",
   "dialog.mcp.empty": "MCPs پیکربندی نشده است",
   "dialog.lsp.empty": "LSPs به طور خودکار از انواع فایل شناسایی می شود",
-  "dialog.plugins.empty": "پلاگین های پیکربندی شده در opencode.json",
+  "dialog.plugins.empty": "پلاگین های پیکربندی شده در hachimicode.json",
   "mcp.status.connected": "متصل است",
   "mcp.status.failed": "شکست خورد",
   "mcp.status.needs_auth": "نیاز به احراز هویت",
@@ -660,7 +660,7 @@ export const dict = {
   "error.chain.responseBody": "بدنه پاسخگویی:\n{{body}}",
   "error.chain.didYouMean": "آیا منظورتان این بود: {{suggestions}}",
   "error.chain.modelNotFound": "مدل پیدا نشد: {{provider}}/{{model}}",
-  "error.chain.checkConfig": "نام ارائه دهنده/مدل پیکربندی (opencode.json) خود را بررسی کنید",
+  "error.chain.checkConfig": "نام ارائه دهنده/مدل پیکربندی (hachimicode.json) خود را بررسی کنید",
   "error.chain.mcpFailed":
     'سرور MCP "{{name}}" ناموفق بود. توجه داشته باشید، OpenCode هنوز از احراز هویت MCP پشتیبانی نمی کند.',
   "error.chain.providerAuthFailed": "احراز هویت ارائه دهنده ناموفق بود ({{provider}}): {{message}}",
