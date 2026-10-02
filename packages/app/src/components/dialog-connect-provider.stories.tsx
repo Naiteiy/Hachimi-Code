@@ -60,7 +60,7 @@ export const ApiKey = {
   render: renderConnection("openrouter", [{ type: "api", label: "API key" }]),
 }
 
-export const HACHIMI CODEZen = {
+export const HachimiCodeZen = {
   render: renderConnection("opencode", [{ type: "api", label: "API key" }]),
 }
 

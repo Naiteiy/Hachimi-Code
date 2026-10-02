@@ -1,5 +1,5 @@
 import type { AgentSideConnection, Usage } from "@agentclientprotocol/sdk"
-import type { AssistantMessage as HACHIMI CODEAssistantMessage, Message } from "@hachimi-code/sdk/v2"
+import type { AssistantMessage as HachimiCodeAssistantMessage, Message } from "@hachimi-code/sdk/v2"
 import { InstanceRef } from "@/effect/instance-ref"
 import { InstanceBootstrap } from "@/project/bootstrap"
 import { InstanceStore } from "@/project/instance-store"
@@ -10,11 +10,11 @@ import { ModelV2 } from "@hachimi-code/core/model"
 import { Provider } from "@/provider/provider"
 import { Context, Effect, Layer, SynchronizedRef } from "effect"
 
-export type AssistantTokenCost = Pick<HACHIMI CODEAssistantMessage, "cost" | "tokens">
+export type AssistantTokenCost = Pick<HachimiCodeAssistantMessage, "cost" | "tokens">
 
 export type AssistantMessage = AssistantTokenCost &
-  Pick<HACHIMI CODEAssistantMessage, "role"> &
-  Partial<Pick<HACHIMI CODEAssistantMessage, "providerID" | "modelID">>
+  Pick<HachimiCodeAssistantMessage, "role"> &
+  Partial<Pick<HachimiCodeAssistantMessage, "providerID" | "modelID">>
 
 export type SessionMessage = {
   readonly info: { readonly role: Message["role"] } | AssistantMessage

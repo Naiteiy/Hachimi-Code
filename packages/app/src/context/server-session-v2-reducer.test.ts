@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import type { HachimiCodeEvent, SessionMessageInfo } from "@hachimi-code/client/promise"
+import type { OpenCodeEvent, SessionMessageInfo } from "@hachimi-code/client/promise"
 import { createV2SessionReducer } from "./server-session-v2-reducer"
 
-const event = (input: object) => input as HachimiCodeEvent
+const event = (input: object) => input as OpenCodeEvent
 const base = { created: 1, location: { directory: "/repo" }, durable: { aggregateID: "ses_1", seq: 1, version: 1 } }
 
 describe("v2 session reducer", () => {

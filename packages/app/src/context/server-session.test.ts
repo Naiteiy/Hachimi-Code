@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { retry } from "@hachimi-code/core/util/retry"
-import type { HachimiCodeEvent, SessionApi } from "@hachimi-code/client/promise"
+import type { OpenCodeEvent, SessionApi } from "@hachimi-code/client/promise"
 import type { Message, OpencodeClient, Part, Session } from "@hachimi-code/sdk/v2/client"
 import { createServerSession } from "./server-session"
 import type { ServerApi } from "@/utils/server"
@@ -173,7 +173,7 @@ describe("server session", () => {
         time: { created: 1 },
       },
     ])
-    const apply = (input: object) => ctx.store.applyV2(input as HachimiCodeEvent)
+    const apply = (input: object) => ctx.store.applyV2(input as OpenCodeEvent)
 
     apply({
       id: "evt_step",

@@ -1,5 +1,5 @@
 import { createOpencodeClient } from "@hachimi-code/sdk/v2/client"
-import { HACHIMI CODE, type HACHIMI CODEClient } from "@hachimi-code/client/promise"
+import { OpenCode, type OpenCodeClient } from "@hachimi-code/client/promise"
 import type { ServerConnection } from "@/context/server"
 import { decode64 } from "@/utils/base64"
 
@@ -44,8 +44,8 @@ export function createSdkForServer({
 export function createApiForServer(input: {
   server: ServerConnection.HttpBase
   fetch?: typeof globalThis.fetch
-}): HACHIMI CODEClient {
-  return HACHIMI CODE.make({
+}): OpenCodeClient {
+  return OpenCode.make({
     baseUrl: input.server.url,
     fetch: input.fetch,
     headers: input.server.password
@@ -59,4 +59,4 @@ export function createApiForServer(input: {
   })
 }
 
-export type ServerApi = HACHIMI CODEClient
+export type ServerApi = OpenCodeClient

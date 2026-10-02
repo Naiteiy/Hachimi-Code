@@ -203,7 +203,7 @@ function DataWordmark() {
   )
 }
 
-function HACHIMI CODEMark() {
+function HachimiCodeMark() {
   return (
     <svg data-slot="opencode-mark" width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
       <path d="M40 40H0V0H40V40Z" fill="var(--stats-logo-bg)" />
@@ -254,7 +254,7 @@ export function Footer(props: {
       <Show when={bridge()}>{(link) => <SectionBridge label={link().label} href={link().href} />}</Show>
       <div data-slot="footer-grid">
         <a data-slot="footer-mark" href="https://opencode.ai" aria-label={i18n.t("footer.homeAria")}>
-          <HACHIMI CODEMark />
+          <HachimiCodeMark />
         </a>
         <FooterColumn title={i18n.t("footer.modelData")} links={modelStats} localHref={localHref} />
         <FooterColumn title={i18n.t("footer.legal")} links={legal} localHref={localHref} />

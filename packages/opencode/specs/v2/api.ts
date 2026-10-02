@@ -1,9 +1,9 @@
 // @ts-nocheck
 
-import { HACHIMI CODE } from "@hachimi-code/core"
+import { HachimiCode } from "@hachimi-code/core"
 import { ReadTool } from "@hachimi-code/core/tools"
 
-const opencode = HACHIMI CODE.make({})
+const opencode = HachimiCode.make({})
 
 opencode.tool.add(ReadTool)
 

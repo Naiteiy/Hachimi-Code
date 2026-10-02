@@ -1,4 +1,4 @@
-export * as HACHIMI CODE from "./opencode"
+export * as HachimiCode from "./opencode"
 export * as Tool from "./tool"
 
 export { ClientError } from "@hachimi-code/client/effect"
