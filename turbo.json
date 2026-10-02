@@ -8,27 +8,27 @@
       "dependsOn": [],
       "outputs": ["dist/**"]
     },
-    "opencode#test": {
+    "hachimicode#test": {
       "dependsOn": ["^build"],
       "outputs": [],
       "passThroughEnv": ["*"]
     },
-    "@opencode-ai/core#test": {
+    "@hachimi-code/core#test": {
       "dependsOn": ["^build"],
       "outputs": []
     },
-    "@opencode-ai/function#test": {
+    "@hachimi-code/function#test": {
       "outputs": []
     },
-    "@opencode-ai/app#test": {
+    "@hachimi-code/app#test": {
       "dependsOn": ["^build"],
       "outputs": []
     },
-    "@opencode-ai/ui#test": {
+    "@hachimi-code/ui#test": {
       "dependsOn": ["^build"],
       "outputs": []
     },
-    "@opencode-ai/session-ui#test": {
+    "@hachimi-code/session-ui#test": {
       "dependsOn": ["^build"],
       "outputs": []
     }

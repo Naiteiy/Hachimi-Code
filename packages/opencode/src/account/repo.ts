@@ -1,10 +1,10 @@
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { LayerNode } from "@hachimi-code/core/effect/layer-node"
 import { eq } from "drizzle-orm"
-import { serviceUse } from "@opencode-ai/core/effect/service-use"
+import { serviceUse } from "@hachimi-code/core/effect/service-use"
 import { Effect, Layer, Option, Schema, Context } from "effect"
 
-import { Database } from "@opencode-ai/core/database/database"
-import { AccountStateTable, AccountTable } from "@opencode-ai/core/account/sql"
+import { Database } from "@hachimi-code/core/database/database"
+import { AccountStateTable, AccountTable } from "@hachimi-code/core/account/sql"
 import { AccessToken, AccountID, AccountRepoError, Info, OrgID, RefreshToken } from "./schema"
 import { normalizeServerUrl } from "./url"
 

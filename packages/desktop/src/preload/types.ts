@@ -1,7 +1,7 @@
-import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
-import type { WslServersPlatform } from "@opencode-ai/app/wsl/types"
-import type { UpdaterState } from "@opencode-ai/app/updater"
-import type { DesktopNativeBundle } from "@opencode-ai/app/i18n/desktop-native"
+import type { DesktopMenuAction } from "@hachimi-code/app/desktop-menu"
+import type { WslServersPlatform } from "@hachimi-code/app/wsl/types"
+import type { UpdaterState } from "@hachimi-code/app/updater"
+import type { DesktopNativeBundle } from "@hachimi-code/app/i18n/desktop-native"
 export type {
   WslDistroProbe,
   WslInstalledDistro,
@@ -14,7 +14,7 @@ export type {
   WslServerRuntime,
   WslServersEvent,
   WslServersState,
-} from "@opencode-ai/app/wsl/types"
+} from "@hachimi-code/app/wsl/types"
 
 export type ServerReadyData = {
   url: string

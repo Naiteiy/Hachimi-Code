@@ -1,9 +1,9 @@
 import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { PtyID } from "@opencode-ai/core/pty/schema"
-import { PtyTicket } from "@opencode-ai/core/pty/ticket"
-import { WorkspaceV2 } from "@opencode-ai/core/workspace"
+import { LayerNode } from "@hachimi-code/core/effect/layer-node"
+import { PtyID } from "@hachimi-code/core/pty/schema"
+import { PtyTicket } from "@hachimi-code/core/pty/ticket"
+import { WorkspaceV2 } from "@hachimi-code/core/workspace"
 import { testEffect } from "../lib/effect"
 
 const it = testEffect(LayerNode.compile(PtyTicket.node))

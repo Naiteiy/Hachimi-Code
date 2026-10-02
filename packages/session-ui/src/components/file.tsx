@@ -1,4 +1,4 @@
-import { sampledChecksum } from "@opencode-ai/core/util/encode"
+import { sampledChecksum } from "@hachimi-code/core/util/encode"
 import {
   areFilesEqual,
   areOptionsEqual,

@@ -1,5 +1,5 @@
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { openUrl } from "@opencode-ai/core/open"
+import { LayerNode } from "@hachimi-code/core/effect/layer-node"
+import { openUrl } from "@hachimi-code/core/open"
 import { Context, Effect, Layer } from "effect"
 
 export interface Interface {

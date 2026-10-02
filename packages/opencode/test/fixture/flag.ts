@@ -1,5 +1,5 @@
-import type { WorkspaceV2 } from "@opencode-ai/core/workspace"
-import { Flag } from "@opencode-ai/core/flag/flag"
+import type { WorkspaceV2 } from "@hachimi-code/core/workspace"
+import { Flag } from "@hachimi-code/core/flag/flag"
 import { Effect, Scope } from "effect"
 
 /**

@@ -1,5 +1,5 @@
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
+import { AppNodeBuilder } from "@hachimi-code/core/effect/app-node-builder"
+import { LayerNode } from "@hachimi-code/core/effect/layer-node"
 import { InstanceBootstrap } from "@/project/bootstrap"
 import { InstanceStore } from "@/project/instance-store"
 

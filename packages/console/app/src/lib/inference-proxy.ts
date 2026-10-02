@@ -1,8 +1,8 @@
-import { Resource } from "@opencode-ai/console-resource"
-import { and, Database, eq, isNotNull, isNull, sql } from "@opencode-ai/console-core/drizzle/index.js"
-import { KeyTable } from "@opencode-ai/console-core/schema/key.sql.js"
-import { ProviderTable } from "@opencode-ai/console-core/schema/provider.sql.js"
-import { WorkspaceTable } from "@opencode-ai/console-core/schema/workspace.sql.js"
+import { Resource } from "@hachimi-code/console-resource"
+import { and, Database, eq, isNotNull, isNull, sql } from "@hachimi-code/console-core/drizzle/index.js"
+import { KeyTable } from "@hachimi-code/console-core/schema/key.sql.js"
+import { ProviderTable } from "@hachimi-code/console-core/schema/provider.sql.js"
+import { WorkspaceTable } from "@hachimi-code/console-core/schema/workspace.sql.js"
 
 const paths: Record<string, string | undefined> = {
   "POST /zen/v1/chat/completions": "/openai/v1/chat/completions",
