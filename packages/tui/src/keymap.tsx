@@ -21,7 +21,7 @@ export const LEADER_TOKEN = "leader"
 export const HACHIMICODE_BASE_MODE = "base"
 export const COMMAND_PALETTE_COMMAND = "command.palette.show"
 
-const HACHIMICODE_MODE_KEY = "opencode.mode"
+const HACHIMICODE_MODE_KEY = "hachimicode.mode"
 
 export const OpencodeKeymapProvider = KeymapProvider
 export const useOpencodeKeymap = useKeymap

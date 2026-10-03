@@ -143,10 +143,13 @@ def decode(path: str) -> tuple[list[Image.Image], list[int]]:
     return frames, durations
 
 
-def encode(path: str, height: int, max_frames: int) -> dict:
+def encode(path: str, height: int, max_frames: int, width: int | None = None) -> dict:
     frames, durations = decode(path)
     box = union_box(frames) or (0, 0, frames[0].width, frames[0].height)
-    width, tall = sprite_size(box, height)
+    # A fixed width gives every sprite the same footprint, which the home screen
+    # needs to lay memes out in uniform lanes.
+    derived, tall = sprite_size(box, height)
+    width = width or derived
     encoded = [(base64.b64encode(fit(frame, box, (width, tall)).tobytes()).decode("ascii"), ms) for frame, ms in zip(frames, durations)]
     kept = thin(encoded, max_frames)
     return {
@@ -198,6 +201,7 @@ def main() -> None:
     parser.add_argument("images", nargs="+", help="source GIF/PNG files, in display order")
     parser.add_argument("--out", required=True, help="output JSON path")
     parser.add_argument("--height", type=int, default=40, help="sprite height in pixels (default 40)")
+    parser.add_argument("--width", type=int, help="force this canvas width so every sprite shares one footprint")
     parser.add_argument("--max-frames", type=int, default=16, help="frame cap per sprite (default 16)")
     parser.add_argument("--preview", type=int, help="print an ANSI preview of this sprite index and exit")
     args = parser.parse_args()
@@ -206,7 +210,7 @@ def main() -> None:
     for path in args.images:
         if not os.path.exists(path):
             raise SystemExit(f"{path}: not found")
-        sprite = encode(path, args.height, args.max_frames)
+        sprite = encode(path, args.height, args.max_frames, args.width)
         print(f"{path}: {sprite.pop('decoded')} decoded -> {len(sprite['frames'])} frames, {sprite['w']}x{sprite['h']} px")
         sprites.append(sprite)
 
