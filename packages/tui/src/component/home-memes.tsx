@@ -14,17 +14,21 @@ export const MEME_SPRITES = memes.sprites.length
 
 /** Global alpha of the layer, so the shower reads as a watermark behind the prompt. */
 const OPACITY = 0.35
-/** Rows travelled per second along a lane. */
+/** Rows travelled per second along a column. */
 const SPEED = 9
-/** Cells of drift per row. A row is twice as tall as a cell is wide, so 2 gives a
- *  true 45 degree slant; the sign is applied per lane to lean every streak left. */
-const SLOPE = 2
-/** Blank rows between two memes inside one lane. */
+/** Cells travelled sideways per row. A row is two pixels tall and a cell is one
+ *  pixel wide, so 2 is a true 45 degree column. */
+const LEAN = 2
+/** Blank rows between two memes inside one column. */
 const V_GAP = 4
-/** Blank columns between two lanes. */
-const H_GAP = 2
-/** Lanes to keep room for, so adjacent lanes can always run against each other. */
-const MIN_LANES = 2
+/** Smallest horizontal gap between two columns. */
+const H_GAP = 3
+/**
+ * Columns are parallel 45 degree lines. Two of them keep their memes at least
+ * half the period apart on the x axis at every point of the cycle, so a period of
+ * twice a sprite's width is the smallest that cannot overlap.
+ */
+const PERIOD = 2 * (memes.sprites[0]!.w + H_GAP)
 const TARGET_FPS = 20
 /** Cells whose two pixels are both below this alpha are left untouched. */
 const ALPHA_FLOOR = 8
@@ -39,34 +43,26 @@ type Sprite = (typeof memes.sprites)[number]
 type Painted = { frame: number; base: RGBA; fg: (RGBA | undefined)[]; bg: (RGBA | undefined)[] }
 
 /**
- * One meme travelling one lane. Position is derived from the shared clock rather
- * than accumulated, so a lane can never drift out of step with its neighbours.
+ * One meme on one column. `slot` is its position along the column, measured in
+ * rows: the meme sits at `slot` rows and `-LEAN * slot` cells, so the memes of a
+ * column line up along the column's own 45 degree axis rather than a vertical one.
  */
 type Actor = {
   sprite: number
-  lane: number
-  /** +1 or -1; adjacent lanes get opposite signs and so scroll against each other. */
+  column: number
+  /** +1 travels down-left, -1 travels up-right; adjacent columns differ. */
   direction: number
-  startY: number
-  startX: number
+  slot: number
   frame: number
   elapsed: number
   painted?: Painted
 }
 
-/**
- * A lane is a slanted conveyor: `spanY` rows tall and `spanX` cells of drift, so
- * the ratio `spanX / spanY` matches the travel slope and a meme leaves the lane
- * exactly where the next one enters it.
- */
 type Field = {
-  lanes: number
-  offsetX: number
-  laneW: number
-  spanX: number
-  spanY: number
+  columns: number
+  /** Rows in one full pass, always a whole number of slots so the stream is even. */
+  cycle: number
   spacing: number
-  perLane: number
 }
 
 type MemeFieldOptions = RenderableOptions<FrameBufferRenderable> & {
@@ -127,28 +123,29 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
     this.requestRender()
   }
 
-  /** Current footprints and headings, so tests can assert the lane discipline. */
+  /** Current footprints and headings, so tests can assert the column geometry. */
   get boxes() {
     const field = this.field
     if (!field) return []
     return this.actors.map((actor) => {
       const spot = this.place(actor, field)
-      const lean = field.spanY === 0 ? 0 : field.spanX / field.spanY
       return {
-        lane: actor.lane,
+        column: actor.column,
         direction: actor.direction,
         x: spot.x,
         y: spot.y,
         width: SPRITE_W,
         height: SPRITE_H,
-        vx: actor.direction * SPEED * lean,
+        vx: -actor.direction * LEAN * SPEED,
         vy: actor.direction * SPEED,
       }
     })
   }
 
-  get laneCount() {
-    return this.field?.lanes ?? 0
+  get columnCount() {
+    const field = this.field
+    if (!field) return 0
+    return field.columns
   }
 
   protected override renderSelf(buffer: OptimizedBuffer, deltaTime = 0): void {
@@ -184,55 +181,46 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
     this.requestRender()
   }
 
-  /** Lay the lanes out for the current frame and restart the shower. */
+  /** Lay the columns out for the current frame and restart the shower. */
   private respawn() {
     if (this.cells.width <= 0 || this.cells.height <= 0) {
       this.field = undefined
       this.actors = []
       return
     }
-    this.field = this.layout(this.cells.width, this.cells.height)
-    this.actors = this.build(this.field)
+    this.field = this.layout(this.cells.height)
+    this.actors = this.build(this.field, this.cells.width)
     this.clock = 0
     this.requestRender()
   }
 
-  /**
-   * How many lanes fit, and how far each one slants. Everything scales from the
-   * frame size in cells, so the shower adapts to any terminal on any platform.
-   */
-  private layout(width: number, height: number): Field {
+  /** How many slanted columns the frame holds, and how long one pass is. */
+  private layout(height: number): Field {
     const spacing = SPRITE_H + V_GAP
-    const perLane = Math.max(1, Math.ceil((height + SPRITE_H) / spacing))
-    const spanY = perLane * spacing
-    // The drift box is exactly as wide as the 45 degree run over one cycle, so a
-    // meme leaves its lane precisely where the next one enters.
-    const ideal = Math.round(SLOPE * spanY)
-    // At 45 degrees a lane is as wide as twice the frame height, so a true 45
-    // degree slant leaves room for only one lane. Keep enough lanes to have
-    // neighbours run against each other and steepen the slant as far as they allow.
-    const fit = Math.floor(width / MIN_LANES) - SPRITE_W - H_GAP
-    const spanX = Math.max(0, Math.min(ideal, fit))
-    const lanes = Math.max(1, Math.floor(width / (SPRITE_W + spanX + H_GAP)))
-    const laneW = SPRITE_W + spanX + H_GAP
-    return { lanes, offsetX: Math.max(0, Math.floor((width - lanes * laneW) / 2)), laneW, spanX, spanY, spacing, perLane }
+    // A whole number of slots per pass keeps the spacing identical across the wrap.
+    const perColumn = Math.max(1, Math.ceil((height + SPRITE_H) / spacing))
+    return { columns: 0, cycle: perColumn * spacing, spacing }
   }
 
-  private build(field: Field): Actor[] {
+  private build(field: Field, width: number): Actor[] {
+    // One column per period, plus two so memes starting off the right edge drift in.
+    const columns = Math.max(1, Math.floor(width / PERIOD) + 2)
+    field.columns = columns
+
     const actors: Actor[] = []
-    for (let lane = 0; lane < field.lanes; lane++) {
-      // Every other lane runs the other way, so neighbours slide against each other.
-      const direction = lane % 2 === 0 ? 1 : -1
-      for (let slot = 0; slot < field.perLane; slot++) {
-        const sprite = (lane * field.perLane + slot) % MEME_SPRITES
+    const perColumn = field.cycle / field.spacing
+    for (let column = 0; column < columns; column++) {
+      // Neighbouring columns run against each other along their own axis.
+      const direction = column % 2 === 0 ? 1 : -1
+      for (let slot = 0; slot < perColumn; slot++) {
+        const sprite = (column * perColumn + slot) % MEME_SPRITES
         actors.push({
           sprite,
-          lane,
+          column,
           direction,
-          // One diagonal line per lane with even spacing, offset per lane so the
-          // lanes do not line up into visible rows.
-          startY: (slot * field.spacing + (lane * field.spacing) / 2) % field.spanY,
-          startX: 0,
+          // Even spacing along the column, offset per column so the columns do not
+          // line up into visible rows.
+          slot: (slot * field.spacing + (column * field.spacing) / 2) % field.cycle,
           frame: Math.floor(this.random() * memes.sprites[sprite]!.frames.length),
           elapsed: 0,
         })
@@ -242,19 +230,10 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
   }
 
   private place(actor: Actor, field: Field) {
-    const travel = this.clock * actor.direction * SPEED
-    // The slant comes from the lane's own proportions rather than the nominal
-    // constant, so one drift period covers exactly one row period and memes wrap
-    // onto the diagonal without ever jumping sideways.
-    const lean = field.spanY === 0 ? 0 : field.spanX / field.spanY
-    // Descending lanes lean left and ascending ones lean right, which is the same
-    // diagonal traversed in opposite senses. A frame with no room to lean falls
-    // back to straight vertical travel rather than dividing by an empty span.
-    const drift = field.spanX === 0 ? 0 : mod(actor.startX - travel * lean, field.spanX)
-    return {
-      x: field.offsetX + actor.lane * field.laneW + drift,
-      y: mod(actor.startY + travel, field.spanY) - SPRITE_H,
-    }
+    // Both senses share one line: x + LEAN * y is constant per column, so a single
+    // offset along it drives the position and only the clock's sign differs.
+    const travel = mod(actor.slot + actor.direction * this.clock * SPEED, field.cycle)
+    return { x: columnOrigin(actor.column) - LEAN * travel, y: travel - SPRITE_H }
   }
 
   private advance(actor: Actor, sprite: Sprite, step: number) {
@@ -295,6 +274,11 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
       }
     }
   }
+}
+
+/** Where a column crosses row zero. */
+function columnOrigin(column: number) {
+  return column * PERIOD
 }
 
 function mod(value: number, span: number) {

@@ -19,6 +19,8 @@ const STEP = 16
 const ALPHA_FLOOR = 8
 const SPRITE_W = memes.sprites[0]!.w
 const SPRITE_H = memes.sprites[0]!.h / 2
+const V_GAP = 4
+const SPACING = SPRITE_H + V_GAP
 
 /** Busiest frame of any sprite, the most cells one meme can ever paint. */
 const MAX_CELLS = Math.max(
@@ -38,7 +40,7 @@ const MAX_CELLS = Math.max(
   ),
 )
 
-async function mount(seed: number, width = 100, height = 30) {
+async function mount(seed: number, width = 120, height = 30) {
   setup = await testRender(
     () => (
       <meme_field
@@ -104,73 +106,61 @@ describe("home meme shower", () => {
     }
   })
 
-  test("fills the frame with memes that stay inside it", async () => {
-    const view = await mount(3, 24, 12)
-    for (let index = 0; index < 60; index++) await view.renderOnce()
-    const boxes = field!.boxes
-    expect(boxes.length).toBeGreaterThan(0)
-    for (const box of boxes) {
-      // A 45 degree streak may overhang a narrow frame; it must still be visible.
-      expect(box.x + SPRITE_W).toBeGreaterThan(0)
-      expect(box.x).toBeLessThan(24)
-    }
-    const lines = view.captureCharFrame().replace(/\n$/, "").split("\n")
-    expect(lines).toHaveLength(12)
-    expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(24)
-  })
-
-  test("keeps memes apart and alternates lane direction", async () => {
-    const view = await mount(21, 90, 26)
-    const baseline = field!.boxes
-    const directions = new Map<number, number>()
-    for (const box of baseline) {
-      const known = directions.get(box.lane)
-      if (known !== undefined) expect(box.direction).toBe(known)
-      directions.set(box.lane, box.direction)
-    }
-    // Neighbouring lanes must run against each other.
-    for (let lane = 1; lane < field!.laneCount; lane++) {
-      if (!directions.has(lane) || !directions.has(lane - 1)) continue
-      expect(directions.get(lane)).toBe(-directions.get(lane - 1)!)
-    }
-
-    for (let index = 0; index < 150; index++) {
+  test("keeps every meme apart, on its own slanted column", async () => {
+    const view = await mount(21, 200, 40)
+    for (let index = 0; index < 120; index++) {
       await view.renderOnce()
       const boxes = field!.boxes
       for (let a = 0; a < boxes.length; a++) {
         for (let b = a + 1; b < boxes.length; b++) {
-          if (boxes[a]!.lane === boxes[b]!.lane) continue
-          // Lanes are disjoint horizontally, so only same-lane pairs can collide.
           expect(overlaps(boxes[a]!, boxes[b]!)).toBe(false)
         }
       }
-      for (let lane = 0; lane < field!.laneCount; lane++) {
-        const inLane = boxes.filter((box) => box.lane === lane)
-        for (let a = 0; a < inLane.length; a++) {
-          for (let b = a + 1; b < inLane.length; b++) {
-            expect(overlaps(inLane[a]!, inLane[b]!)).toBe(false)
-          }
-        }
+      // Within a column the memes sit on one 45 degree line: x + 2y is constant.
+      for (let column = 0; column < field!.columnCount; column++) {
+        const line = boxes.filter((box) => box.column === column).map((box) => box.x + 2 * box.y)
+        expect(Math.max(...line) - Math.min(...line)).toBeLessThan(1)
       }
     }
   })
 
-  test("moves diagonally and faster than a crawl", async () => {
-    await mount(4, 90, 26)
+  test("runs neighbouring columns against each other at 45 degrees", async () => {
+    await mount(4, 200, 40)
+    const directions = new Map<number, number>()
     for (const box of field!.boxes) {
-      expect(Math.hypot(box.vx, box.vy)).toBeGreaterThan(3)
-      expect(box.vx).not.toBe(0)
+      directions.set(box.column, box.direction)
+      // A row is two pixels tall, so two cells per row is a true 45 degrees.
+      expect(Math.abs(box.vx)).toBeCloseTo(2 * Math.abs(box.vy), 5)
       expect(box.vy).not.toBe(0)
+    }
+    for (let column = 1; column < field!.columnCount; column++) {
+      expect(directions.get(column)).toBe(-directions.get(column - 1)!)
     }
   })
 
-  test("sizes the lanes from the frame width", async () => {
+  test("spaces memes evenly along a column", async () => {
+    await mount(6, 200, 40)
+    for (let column = 0; column < field!.columnCount; column++) {
+      const ys = field!.boxes
+        .filter((box) => box.column === column)
+        .map((box) => box.y)
+        .sort((a, b) => a - b)
+      expect(ys.length).toBeGreaterThan(1)
+      for (let index = 1; index < ys.length; index++) {
+        // Evenly spaced, allowing the single gap where the column wraps.
+        const gap = ys[index]! - ys[index - 1]!
+        expect(gap === SPACING || gap > SPACING).toBe(true)
+      }
+    }
+  })
+
+  test("sizes the column count from the frame width", async () => {
     await mount(2, 120, 20)
-    const narrow = field!.laneCount
+    const narrow = field!.columnCount
     setup?.renderer.destroy()
     field = undefined
     await mount(2, 400, 20)
-    expect(field!.laneCount).toBeGreaterThan(narrow)
+    expect(field!.columnCount).toBeGreaterThan(narrow)
   })
 })
 
