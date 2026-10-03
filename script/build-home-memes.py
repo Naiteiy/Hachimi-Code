@@ -150,8 +150,15 @@ def encode(
     width: int | None = None,
     ink: int = 8,
     solid: bool = False,
+    sticker: int = 0,
 ) -> dict:
     frames, durations = decode(path)
+    if sticker:
+        # Flatten the shading into a few flat tones: at icon sizes a smooth
+        # gradient turns to mush, while flat patches stay readable.
+        for index, frame in enumerate(frames):
+            quantized = frame.convert("RGB").quantize(colors=sticker, method=Image.MEDIANCUT).convert("RGB")
+            frames[index] = Image.merge("RGBA", (*quantized.split(), frame.getchannel("A")))
     if solid:
         # Hard edges: a soft glow around a subject inflates the crop box and then
         # dissolves into the panel colour, which reads as a blurry halo.
@@ -218,6 +225,7 @@ def main() -> None:
     parser.add_argument("--width", type=int, help="force this canvas width so every sprite shares one footprint")
     parser.add_argument("--ink", type=int, default=8, help="alpha above which a pixel counts as ink (default 8)")
     parser.add_argument("--solid", action="store_true", help="snap alpha to fully on or off for hard edges")
+    parser.add_argument("--sticker", type=int, default=0, help="quantize colours to this many flat tones")
     parser.add_argument("--max-frames", type=int, default=16, help="frame cap per sprite (default 16)")
     parser.add_argument("--preview", type=int, help="print an ANSI preview of this sprite index and exit")
     args = parser.parse_args()
@@ -226,7 +234,7 @@ def main() -> None:
     for path in args.images:
         if not os.path.exists(path):
             raise SystemExit(f"{path}: not found")
-        sprite = encode(path, args.height, args.max_frames, args.width, args.ink, args.solid)
+        sprite = encode(path, args.height, args.max_frames, args.width, args.ink, args.solid, args.sticker)
         print(f"{path}: {sprite.pop('decoded')} decoded -> {len(sprite['frames'])} frames, {sprite['w']}x{sprite['h']} px")
         sprites.append(sprite)
 

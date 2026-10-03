@@ -43,6 +43,9 @@ const ALPHA_FLOOR = 8
 /** Fallback step when a renderer reports no delta, so animation never stalls. */
 const MIN_STEP = 16
 const TOP_HALF = 0x2580
+// A bare clear() leaves every cell opaque black, which would paint a dark
+// rectangle over whatever sits behind the layer.
+const TRANSPARENT = RGBA.fromInts(0, 0, 0, 0)
 // Every sprite is baked to one canvas, so the layout can treat them as equal.
 const SPRITE_W = memes.sprites[0]!.w
 const SPRITE_H = memes.sprites[0]!.h / 2
@@ -176,7 +179,7 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
     if (!this.field) return
 
     // Memes move, so the previous frame has to be wiped or they leave trails.
-    frameBuffer.clear()
+    frameBuffer.clear(TRANSPARENT)
     for (const actor of this.actors) {
       this.advance(actor, memes.sprites[actor.sprite]!, step)
       this.paint(actor, this.field, width, height)
