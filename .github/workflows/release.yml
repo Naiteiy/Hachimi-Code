@@ -2,13 +2,13 @@ name: Release
 
 # Publishing happens when you push a version tag, for example:
 #
-#   git tag v0.1.0
-#   git push origin v0.1.0
+#   git tag v0.1.1-hachimi
+#   git push origin v0.1.1-hachimi
 #
 # You can also run it by hand from the Actions tab, where you type the name of a
-# tag that already exists. Each run builds the standalone binary on a native
-# runner and attaches it to a GitHub Release, so anyone can download a runnable
-# build without installing Bun.
+# tag that already exists. Each platform is built on a runner of that platform,
+# so native dependencies (node-pty, watcher binaries) are correct for it, and
+# every archive is attached to a GitHub Release.
 on:
   push:
     tags: ["v*"]
@@ -25,17 +25,22 @@ permissions:
 jobs:
   build:
     strategy:
+      # One failing platform must not hide the others' logs.
       fail-fast: false
       matrix:
         include:
-          # Building on the platform itself keeps every native dependency
-          # (node-pty, watcher binaries) correct for that platform.
           - runner: ubuntu-latest
             target: linux-x64
+          - runner: ubuntu-24.04-arm
+            target: linux-arm64
           - runner: macos-latest
             target: darwin-arm64
+          - runner: macos-26-intel
+            target: darwin-x64
+          - runner: windows-2025
+            target: windows-x64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
 
@@ -51,15 +56,21 @@ jobs:
         # and would report a version like 0.0.0--202601010000. The script honours
         # this variable, so the released binary reports the tag instead.
         env:
-          HACHIMICODE_VERSION: ${{ github.event.inputs.tag || github.ref_name }}
-        run: |
-          tag="${HACHIMICODE_VERSION#v}"
-          HACHIMICODE_VERSION="$tag" bun run script/build.ts --single
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        shell: bash
         working-directory: packages/opencode
+        run: HACHIMICODE_VERSION="${TAG#v}" bun run script/build.ts --single
 
-      # The build writes dist/<package>-<os>-<arch>/, so the archive is named
-      # after the platform rather than the package.
-      - name: Package the build
+      - name: Package it as a zip (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "packages/opencode/dist/hachimicode-${{ matrix.target }}/*" `
+            -DestinationPath "hachimicode-${{ matrix.target }}.zip"
+
+      - name: Package it as a tarball (Linux and macOS)
+        if: runner.os != 'Windows'
+        shell: bash
         run: |
           tar -czf "hachimicode-${{ matrix.target }}.tar.gz" \
             -C "packages/opencode/dist/hachimicode-${{ matrix.target }}" .
@@ -67,8 +78,10 @@ jobs:
       - uses: actions/upload-artifact@v5
         with:
           name: hachimicode-${{ matrix.target }}
-          path: hachimicode-${{ matrix.target }}.tar.gz
-          if-no-files-found: error
+          # A glob that matches nothing fails the step, which is what we want.
+          path: |
+            hachimicode-${{ matrix.target }}.tar.gz
+            hachimicode-${{ matrix.target }}.zip
 
   publish:
     needs: build
@@ -95,4 +108,4 @@ jobs:
             --repo "$REPO" \
             --title "$TAG" \
             --generate-notes \
-            download/*.tar.gz
+            download/*
