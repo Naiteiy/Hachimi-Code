@@ -57,7 +57,7 @@ jobs:
           tar -czf "hachimicode-${{ matrix.target }}.tar.gz" \
             -C "packages/opencode/dist/hachimicode-${{ matrix.target }}" .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: hachimicode-${{ matrix.target }}
           path: hachimicode-${{ matrix.target }}.tar.gz
@@ -67,7 +67,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: download
           merge-multiple: true
