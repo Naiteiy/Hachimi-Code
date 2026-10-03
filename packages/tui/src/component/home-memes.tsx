@@ -14,13 +14,17 @@ export const MEME_SPRITES = memes.sprites.length
 
 /** Global alpha of the layer, so the shower reads as a watermark behind the prompt. */
 const OPACITY = 0.35
-/** Rows travelled per second along a column. */
-const SPEED = 9
+/**
+ * Rows travelled per second along a column. Kept at one row per rendered frame:
+ * a fractional step rounds to 0 rows on one frame and 1 on the next, which reads
+ * as the column stuttering even though nothing is colliding.
+ */
+const SPEED = 20
 /** Cells travelled sideways per row. A row is two pixels tall and a cell is one
  *  pixel wide, so 2 is a true 45 degree column. */
 const LEAN = 2
 /** Blank rows between two memes inside one column. */
-const V_GAP = 4
+const V_GAP = 2
 /** Smallest horizontal gap between two columns. */
 const H_GAP = 3
 /**
@@ -30,6 +34,8 @@ const H_GAP = 3
  */
 const PERIOD = 2 * (memes.sprites[0]!.w + H_GAP)
 const TARGET_FPS = 20
+// SPEED above is one row per frame at TARGET_FPS, and two cells per row is the
+// 45 degree lean, so each frame advances exactly (-2, +1) on screen.
 /** Cells whose two pixels are both below this alpha are left untouched. */
 const ALPHA_FLOOR = 8
 /** Fallback step when a renderer reports no delta, so animation never stalls. */
@@ -38,6 +44,8 @@ const TOP_HALF = 0x2580
 // Every sprite is baked to one canvas, so the layout can treat them as equal.
 const SPRITE_W = memes.sprites[0]!.w
 const SPRITE_H = memes.sprites[0]!.h / 2
+/** Rows from one meme to the next inside a column. */
+export const MEME_SPACING = SPRITE_H + V_GAP
 
 type Sprite = (typeof memes.sprites)[number]
 type Painted = { frame: number; base: RGBA; fg: (RGBA | undefined)[]; bg: (RGBA | undefined)[] }

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { RGBA } from "@opentui/core"
 import { testRender } from "@opentui/solid"
-import { MEME_SPRITES, MemeFieldRenderable } from "../../src/component/home-memes"
+import { MEME_SPACING, MEME_SPRITES, MemeFieldRenderable } from "../../src/component/home-memes"
 import memes from "../../src/component/home-memes/memes.json"
 
 let setup: Awaited<ReturnType<typeof testRender>> | undefined
@@ -19,8 +19,7 @@ const STEP = 16
 const ALPHA_FLOOR = 8
 const SPRITE_W = memes.sprites[0]!.w
 const SPRITE_H = memes.sprites[0]!.h / 2
-const V_GAP = 4
-const SPACING = SPRITE_H + V_GAP
+const SPACING = MEME_SPACING
 
 /** Busiest frame of any sprite, the most cells one meme can ever paint. */
 const MAX_CELLS = Math.max(
