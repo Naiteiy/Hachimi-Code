@@ -15,11 +15,13 @@ export const MEME_SPRITES = memes.sprites.length
 /** Global alpha of the layer, so the shower reads as a watermark behind the prompt. */
 const OPACITY = 0.35
 /**
- * Rows travelled per second along a column. Kept at one row per rendered frame:
- * a fractional step rounds to 0 rows on one frame and 1 on the next, which reads
- * as the column stuttering even though nothing is colliding.
+ * Rows travelled per second along a column. Half a row per frame at TARGET_FPS:
+ * a grid can only draw whole cells, so the sprite is positioned to the half cell
+ * and the remaining half row comes from pairing pixel rows differently in each
+ * frame (see `blend`). Anything that is not a multiple of half a row per frame
+ * would round to a stuck frame followed by a double step, which reads as stutter.
  */
-const SPEED = 20
+const SPEED = 10
 /** Cells travelled sideways per row. A row is two pixels tall and a cell is one
  *  pixel wide, so 2 is a true 45 degree column. */
 const LEAN = 2
@@ -34,8 +36,8 @@ const H_GAP = 3
  */
 const PERIOD = 2 * (memes.sprites[0]!.w + H_GAP)
 const TARGET_FPS = 20
-// SPEED above is one row per frame at TARGET_FPS, and two cells per row is the
-// 45 degree lean, so each frame advances exactly (-2, +1) on screen.
+// SPEED above is half a row per frame at TARGET_FPS, so a frame advances one cell
+// left and half a row down and two frames complete one cell on the 45 degree lean.
 /** Cells whose two pixels are both below this alpha are left untouched. */
 const ALPHA_FLOOR = 8
 /** Fallback step when a renderer reports no delta, so animation never stalls. */
@@ -48,7 +50,8 @@ const SPRITE_H = memes.sprites[0]!.h / 2
 export const MEME_SPACING = SPRITE_H + V_GAP
 
 type Sprite = (typeof memes.sprites)[number]
-type Painted = { frame: number; base: RGBA; fg: (RGBA | undefined)[]; bg: (RGBA | undefined)[] }
+type Phase = { fg: (RGBA | undefined)[]; bg: (RGBA | undefined)[] }
+type Painted = { frame: number; base: RGBA; phases: Phase[] }
 
 /**
  * One meme on one column. `slot` is its position along the column, measured in
@@ -260,13 +263,17 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
     const sprite = memes.sprites[actor.sprite]!
     const frame = sprite.frames[actor.frame]!
     if (actor.painted?.frame !== actor.frame || !sameColor(actor.painted.base, this.base)) {
-      actor.painted = { frame: actor.frame, base: this.base, ...blend(frame.px, sprite.w, sprite.h, this.base) }
+      actor.painted = { frame: actor.frame, base: this.base, phases: blend(frame.px, sprite.w, sprite.h, this.base) }
     }
 
     const spot = this.place(actor, field)
+    // Whole cells place the sprite, and the leftover half row picks which pixel
+    // rows share a cell, which is what makes a half row of travel drawable.
+    const originY = Math.floor(spot.y)
+    const phase = spot.y - originY >= 0.5 ? 1 : 0
+    const painted = actor.painted.phases[phase]!
     const originX = Math.round(spot.x)
-    const originY = Math.round(spot.y)
-    const rows = sprite.h / 2
+    const rows = sprite.h / 2 + phase
     const target = this.frameBuffer
     for (let row = 0; row < rows; row++) {
       const y = originY + row
@@ -275,8 +282,8 @@ export class MemeFieldRenderable extends FrameBufferRenderable {
         const x = originX + column
         if (x < 0 || x >= width) continue
         const cell = row * sprite.w + column
-        const fg = actor.painted.fg[cell]
-        const bg = actor.painted.bg[cell]
+        const fg = painted.fg[cell]
+        const bg = painted.bg[cell]
         if (!fg || !bg) continue
         target.drawChar(TOP_HALF, x, y, fg, bg)
       }
@@ -301,25 +308,33 @@ function mod(value: number, span: number) {
  * nothing is visible stay undefined so `paint` skips them and the page
  * underneath is left alone.
  */
-function blend(encoded: string, width: number, height: number, base: RGBA) {
+function blend(encoded: string, width: number, height: number, base: RGBA): Phase[] {
   const bytes = Buffer.from(encoded, "base64")
   const rows = height / 2
-  const fg: (RGBA | undefined)[] = new Array(rows * width)
-  const bg: (RGBA | undefined)[] = new Array(rows * width)
-  for (let row = 0; row < rows; row++) {
-    for (let column = 0; column < width; column++) {
-      const top = pixel(bytes, (row * 2 * width + column) * 4)
-      const bottom = pixel(bytes, ((row * 2 + 1) * width + column) * 4)
-      if (top.a < ALPHA_FLOOR && bottom.a < ALPHA_FLOOR) continue
-      const cell = row * width + column
-      fg[cell] = mix(base, top)
-      bg[cell] = mix(base, bottom)
+  // Phase 0 pairs pixel rows (2i, 2i+1); phase 1 pairs (2i-1, 2i), which shifts
+  // the whole sprite down by half a cell without moving any of its pixels.
+  return [0, 1].map((phase) => {
+    const fg: (RGBA | undefined)[] = new Array(rows * width)
+    const bg: (RGBA | undefined)[] = new Array(rows * width)
+    for (let row = 0; row < rows; row++) {
+      for (let column = 0; column < width; column++) {
+        const top = pixel(bytes, width, height, row * 2 - phase, column)
+        const bottom = pixel(bytes, width, height, row * 2 + 1 - phase, column)
+        if (top.a < ALPHA_FLOOR && bottom.a < ALPHA_FLOOR) continue
+        const cell = row * width + column
+        fg[cell] = mix(base, top)
+        bg[cell] = mix(base, bottom)
+      }
     }
-  }
-  return { fg, bg }
+    return { fg, bg }
+  })
 }
 
-function pixel(bytes: Buffer, offset: number) {
+function pixel(bytes: Buffer, width: number, height: number, row: number, column: number) {
+  // Phase 1 reaches half a cell above and below the sprite, so those reads are
+  // simply outside it and come back transparent.
+  if (row < 0 || row >= height) return { r: 0, g: 0, b: 0, a: 0 }
+  const offset = (row * width + column) * 4
   return { r: bytes[offset]!, g: bytes[offset + 1]!, b: bytes[offset + 2]!, a: bytes[offset + 3]! }
 }
 

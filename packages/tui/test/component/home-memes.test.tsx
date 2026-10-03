@@ -146,9 +146,9 @@ describe("home meme shower", () => {
         .sort((a, b) => a - b)
       expect(ys.length).toBeGreaterThan(1)
       for (let index = 1; index < ys.length; index++) {
-        // Evenly spaced, allowing the single gap where the column wraps.
-        const gap = ys[index]! - ys[index - 1]!
-        expect(gap === SPACING || gap > SPACING).toBe(true)
+        // Positions carry a half-row fraction, so compare with a tolerance. A
+        // column's cycle is a whole number of slots, so even the wrap gap matches.
+        expect(ys[index]! - ys[index - 1]!).toBeCloseTo(SPACING, 6)
       }
     }
   })
