@@ -47,7 +47,14 @@ jobs:
         run: bun install
 
       - name: Build the standalone binary
-        run: bun run script/build.ts --single
+        # A tag push has no current branch, so the build cannot derive a channel
+        # and would report a version like 0.0.0--202601010000. The script honours
+        # this variable, so the released binary reports the tag instead.
+        env:
+          HACHIMICODE_VERSION: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          tag="${HACHIMICODE_VERSION#v}"
+          HACHIMICODE_VERSION="$tag" bun run script/build.ts --single
         working-directory: packages/opencode
 
       # The build writes dist/<package>-<os>-<arch>/, so the archive is named
