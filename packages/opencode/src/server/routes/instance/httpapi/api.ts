@@ -76,7 +76,7 @@ export const InstanceHttpApi = HttpApi.make("opencode-instance")
   .addHttpApi(WorkspaceApi)
   .middleware(SchemaErrorMiddleware)
 
-export const HachimiCodeHttpApi = HttpApi.make("opencode")
+export const HachimiCodeHttpApi = HttpApi.make("hachimicode")
   .addHttpApi(RootHttpApi)
   .addHttpApi(EventApi)
   .addHttpApi(InstanceHttpApi)

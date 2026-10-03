@@ -59,7 +59,7 @@ async function start(command: StartCommand) {
     listener = await Server.listen({
       port: command.port,
       hostname: command.hostname,
-      username: "opencode",
+      username: "hachimicode",
       password: command.password,
       cors: ["oc://renderer"],
     })
@@ -82,7 +82,7 @@ async function stop() {
 
 function prepareSidecarEnv(password: string, userDataPath: string) {
   Object.assign(process.env, {
-    HACHIMICODE_SERVER_USERNAME: "opencode",
+    HACHIMICODE_SERVER_USERNAME: "hachimicode",
     HACHIMICODE_SERVER_PASSWORD: password,
     XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
   })

@@ -529,7 +529,7 @@ function normalizeParameter(param: OpenApiParameter, route: string) {
 
 export const PublicApi = HachimiCodeHttpApi.annotateMerge(
   OpenApi.annotations({
-    title: "opencode",
+    title: "hachimicode",
     version: "1.0.0",
     description: "hachimicode api",
     transform: matchLegacyOpenApi,
