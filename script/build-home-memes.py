@@ -143,9 +143,23 @@ def decode(path: str) -> tuple[list[Image.Image], list[int]]:
     return frames, durations
 
 
-def encode(path: str, height: int, max_frames: int, width: int | None = None) -> dict:
+def encode(
+    path: str,
+    height: int,
+    max_frames: int,
+    width: int | None = None,
+    ink: int = 8,
+    solid: bool = False,
+) -> dict:
     frames, durations = decode(path)
-    box = union_box(frames) or (0, 0, frames[0].width, frames[0].height)
+    if solid:
+        # Hard edges: a soft glow around a subject inflates the crop box and then
+        # dissolves into the panel colour, which reads as a blurry halo.
+        for index, frame in enumerate(frames):
+            alpha = frame.getchannel("A").point(lambda value: 255 if value >= ink else 0)
+            frame.putalpha(alpha)
+            frames[index] = frame
+    box = union_box(frames, ink) or (0, 0, frames[0].width, frames[0].height)
     # A fixed width gives every sprite the same footprint, which the home screen
     # needs to lay memes out in uniform lanes.
     derived, tall = sprite_size(box, height)
@@ -202,6 +216,8 @@ def main() -> None:
     parser.add_argument("--out", required=True, help="output JSON path")
     parser.add_argument("--height", type=int, default=40, help="sprite height in pixels (default 40)")
     parser.add_argument("--width", type=int, help="force this canvas width so every sprite shares one footprint")
+    parser.add_argument("--ink", type=int, default=8, help="alpha above which a pixel counts as ink (default 8)")
+    parser.add_argument("--solid", action="store_true", help="snap alpha to fully on or off for hard edges")
     parser.add_argument("--max-frames", type=int, default=16, help="frame cap per sprite (default 16)")
     parser.add_argument("--preview", type=int, help="print an ANSI preview of this sprite index and exit")
     args = parser.parse_args()
@@ -210,7 +226,7 @@ def main() -> None:
     for path in args.images:
         if not os.path.exists(path):
             raise SystemExit(f"{path}: not found")
-        sprite = encode(path, args.height, args.max_frames, args.width)
+        sprite = encode(path, args.height, args.max_frames, args.width, args.ink, args.solid)
         print(f"{path}: {sprite.pop('decoded')} decoded -> {len(sprite['frames'])} frames, {sprite['w']}x{sprite['h']} px")
         sprites.append(sprite)
 

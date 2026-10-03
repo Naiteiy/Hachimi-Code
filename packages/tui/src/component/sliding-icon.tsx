@@ -6,16 +6,15 @@ import {
   type RenderableOptions,
 } from "@opentui/core"
 import { extend } from "@opentui/solid"
-import { tint, useTheme } from "../context/theme"
 import icon from "./sliding-icon/icon.json" with { type: "json" }
 
 /** How far the icon travels either side of its resting place, in cells. */
-const TRAVEL = 5
+const TRAVEL = 2
 /** Seconds for one full left-right-left sweep. */
 const PERIOD = 2.4
 const TARGET_FPS = 30
-/** Cells whose two pixels are both below this alpha are left untouched. */
-const ALPHA_FLOOR = 8
+/** Cells whose two pixels are both fully transparent are left untouched. */
+const ALPHA_FLOOR = 1
 /** Fallback step when a renderer reports no delta, so animation never stalls. */
 const MIN_STEP = 16
 const TOP_HALF = 0x2580
@@ -24,10 +23,9 @@ const SPRITE_W = SPRITE.w
 const SPRITE_H = SPRITE.h / 2
 
 type Phase = { fg: (RGBA | undefined)[]; bg: (RGBA | undefined)[] }
-type Painted = { base: RGBA; phases: Phase[] }
+type Painted = { phases: Phase[] }
 
 type SlidingIconOptions = RenderableOptions<FrameBufferRenderable> & {
-  baseColor?: RGBA
   /** Overrides the renderer-supplied delta so the sweep is reproducible in tests. */
   fixedStep?: number
 }
@@ -38,13 +36,12 @@ type SlidingIconOptions = RenderableOptions<FrameBufferRenderable> & {
  * home memes are, because opentui has no image renderable.
  */
 export class SlidingIconRenderable extends FrameBufferRenderable {
-  private base = RGBA.fromInts(0, 0, 0)
   private painted: Painted | undefined
   private clock = 0
   private step: number | undefined
 
   constructor(ctx: RenderContext, options: SlidingIconOptions = {}) {
-    const { baseColor, fixedStep, ...rest } = options
+    const { fixedStep, ...rest } = options
     super(ctx, {
       ...rest,
       width: typeof rest.width === "number" ? rest.width : SPRITE_W + TRAVEL * 2,
@@ -56,15 +53,7 @@ export class SlidingIconRenderable extends FrameBufferRenderable {
 
     if (rest.width !== undefined && typeof rest.width !== "number") this.width = rest.width
     if (rest.height !== undefined && typeof rest.height !== "number") this.height = rest.height
-    if (baseColor) this.base = baseColor
     this.step = fixedStep
-  }
-
-  set baseColor(value: RGBA | undefined) {
-    if (!value || sameColor(this.base, value)) return
-    this.base = value
-    this.painted = undefined
-    this.requestRender()
   }
 
   set fixedStep(value: number | undefined) {
@@ -87,9 +76,10 @@ export class SlidingIconRenderable extends FrameBufferRenderable {
     const frameBuffer = this.frameBuffer
     const width = frameBuffer.width
     const height = frameBuffer.height
-    if (!this.painted || !sameColor(this.painted.base, this.base)) {
-      this.painted = { base: this.base, phases: blend(SPRITE.frames[0]!.px, SPRITE.w, SPRITE.h, this.base) }
-    }
+    // The icon is drawn exactly as baked: inked cells take the picture's own
+    // colours and everything else stays untouched, so the panel behind it shows
+    // through instead of a rectangle of blended background.
+    this.painted ??= { phases: blend(SPRITE.frames[0]!.px, SPRITE.w, SPRITE.h) }
 
     // A sine sweep eases at both ends, so the icon reads as sliding rather than snapping.
     const progress = (this.clock / PERIOD) % 1
@@ -120,7 +110,7 @@ export class SlidingIconRenderable extends FrameBufferRenderable {
  * tall, so it carries the colours of both pixels; transparent pixels collapse to
  * the theme background and invisible cells stay out of the arrays.
  */
-function blend(encoded: string, width: number, height: number, base: RGBA): Phase[] {
+function blend(encoded: string, width: number, height: number): Phase[] {
   const bytes = Buffer.from(encoded, "base64")
   const rows = height / 2
   return [0, 1].map((phase) => {
@@ -132,8 +122,8 @@ function blend(encoded: string, width: number, height: number, base: RGBA): Phas
         const bottom = pixel(bytes, width, height, row * 2 + 1 - phase, column)
         if (top.a < ALPHA_FLOOR && bottom.a < ALPHA_FLOOR) continue
         const cell = row * width + column
-        fg[cell] = mix(base, top)
-        bg[cell] = mix(base, bottom)
+        fg[cell] = opaque(top)
+        bg[cell] = opaque(bottom)
       }
     }
     return { fg, bg }
@@ -146,12 +136,8 @@ function pixel(bytes: Buffer, width: number, height: number, row: number, column
   return { r: bytes[offset]!, g: bytes[offset + 1]!, b: bytes[offset + 2]!, a: bytes[offset + 3]! }
 }
 
-function mix(base: RGBA, value: { r: number; g: number; b: number; a: number }) {
-  return tint(base, RGBA.fromInts(value.r, value.g, value.b), value.a / 255)
-}
-
-function sameColor(a: RGBA, b: RGBA) {
-  return a.r === b.r && a.g === b.g && a.b === b.b && a.a === b.a
+function opaque(value: { r: number; g: number; b: number; a: number }) {
+  return RGBA.fromInts(value.r, value.g, value.b)
 }
 
 declare module "@opentui/solid" {
@@ -166,6 +152,5 @@ export const SLIDING_ICON_WIDTH = SPRITE_W + TRAVEL * 2
 export const SLIDING_ICON_HEIGHT = SPRITE_H
 
 export function SlidingIcon() {
-  const { theme } = useTheme()
-  return <sliding_icon width={SLIDING_ICON_WIDTH} height={SLIDING_ICON_HEIGHT} baseColor={theme.background} />
+  return <sliding_icon width={SLIDING_ICON_WIDTH} height={SLIDING_ICON_HEIGHT} />
 }

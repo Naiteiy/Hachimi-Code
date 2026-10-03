@@ -1,30 +1,22 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { RGBA } from "@opentui/core"
 import { testRender } from "@opentui/solid"
-import { SlidingIconRenderable } from "../../src/component/sliding-icon"
+import { SLIDING_ICON_WIDTH, SlidingIconRenderable } from "../../src/component/sliding-icon"
+import icon from "../../src/component/sliding-icon/icon.json"
 
 let setup: Awaited<ReturnType<typeof testRender>> | undefined
-let icon: SlidingIconRenderable | undefined
+let field: SlidingIconRenderable | undefined
 
 afterEach(() => {
   setup?.renderer.destroy()
   setup = undefined
-  icon = undefined
+  field = undefined
 })
 
-const BASE = RGBA.fromInts(0x17, 0x0f, 0x07)
+const ICON_W = icon.sprites[0]!.w
 
 async function mount() {
   setup = await testRender(
-    () => (
-      <sliding_icon
-        ref={(value: SlidingIconRenderable) => (icon = value)}
-        width={23}
-        height={4}
-        baseColor={BASE}
-        fixedStep={40}
-      />
-    ),
+    () => <sliding_icon ref={(value: SlidingIconRenderable) => (field = value)} width={SLIDING_ICON_WIDTH} height={3} fixedStep={40} />,
     { width: 60, height: 10 },
   )
   await setup.renderOnce()
@@ -47,29 +39,22 @@ describe("sliding loading icon", () => {
     expect(painted(view.captureCharFrame())).toBeGreaterThan(5)
   })
 
-  test("sweeps left and right and comes back", async () => {
+  test("sweeps both ways inside its own width", async () => {
     const view = await mount()
     const offsets: number[] = []
     for (let index = 0; index < 80; index++) {
-      offsets.push(icon!.offset)
+      offsets.push(field!.offset)
       await view.renderOnce()
     }
     const min = Math.min(...offsets)
     const max = Math.max(...offsets)
-    // It must travel a real distance, and both directions must be visited.
-    expect(max - min).toBeGreaterThanOrEqual(8)
-    const rising = offsets.findIndex((value, index) => index > 0 && value > offsets[index - 1]!)
-    const falling = offsets.findIndex((value, index) => index > 0 && value < offsets[index - 1]!)
-    expect(rising).toBeGreaterThan(-1)
-    expect(falling).toBeGreaterThan(-1)
-  })
-
-  test("stays inside its own width", async () => {
-    const view = await mount()
-    for (let index = 0; index < 80; index++) {
-      await view.renderOnce()
-      expect(icon!.offset).toBeGreaterThanOrEqual(0)
-      expect(icon!.offset).toBeLessThanOrEqual(23 - 13)
-    }
+    expect(min).toBeGreaterThanOrEqual(0)
+    expect(max).toBeLessThanOrEqual(SLIDING_ICON_WIDTH - ICON_W)
+    // It must actually travel, in both directions.
+    expect(max - min).toBeGreaterThanOrEqual(3)
+    const rising = offsets.some((value, index) => index > 0 && value > offsets[index - 1]!)
+    const falling = offsets.some((value, index) => index > 0 && value < offsets[index - 1]!)
+    expect(rising).toBe(true)
+    expect(falling).toBe(true)
   })
 })
