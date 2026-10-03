@@ -6,7 +6,7 @@ import { Global } from "@hachimi-code/core/global"
 
 describe("global paths", () => {
   test("tmp path is under the system temp directory", () => {
-    expect(Global.Path.tmp).toBe(path.join(os.tmpdir(), "opencode"))
+    expect(Global.Path.tmp).toBe(path.join(os.tmpdir(), "hachimicode"))
     expect(Global.make().tmp).toBe(Global.Path.tmp)
   })
 
