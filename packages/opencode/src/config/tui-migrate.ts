@@ -114,11 +114,11 @@ async function backupAndStripLegacy(file: string, source: string) {
 
 async function opencodeFiles(input: { directories: string[]; cwd: string }) {
   const files = [
-    ...ConfigPaths.fileInDirectory(Global.Path.config, "opencode"),
+    ...ConfigPaths.fileInDirectory(Global.Path.config, "hachimicode"),
     ...(await Filesystem.findUp(["hachimicode.json", "hachimicode.jsonc"], input.cwd, undefined, { rootFirst: true })),
   ]
   for (const dir of unique(input.directories)) {
-    files.push(...ConfigPaths.fileInDirectory(dir, "opencode"))
+    files.push(...ConfigPaths.fileInDirectory(dir, "hachimicode"))
   }
   if (Flag.HACHIMICODE_CONFIG) files.push(Flag.HACHIMICODE_CONFIG)
 

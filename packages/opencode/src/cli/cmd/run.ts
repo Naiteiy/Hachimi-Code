@@ -1,13 +1,13 @@
 import type { PermissionV1 } from "@hachimi-code/core/v1/permission"
 import { FSUtil } from "@hachimi-code/core/fs-util"
-// CLI entry point for `opencode run` and `opencode --mini`.
+// CLI entry point for `hachimicode run` and `hachimicode --mini`.
 //
 // Handles three modes:
 //   1. Non-interactive (default): sends a single prompt, streams events to
 //      stdout, and exits when the session goes idle.
-//   2. Interactive local (`opencode --mini`): boots the split-footer direct mode
+//   2. Interactive local (`hachimicode --mini`): boots the split-footer direct mode
 //      with an in-process server (no external HTTP).
-//   3. Interactive attach (`opencode --mini --attach`): connects to a running
+//   3. Interactive attach (`hachimicode --mini --attach`): connects to a running
 //      opencode server and runs interactive mode against it.
 //
 // Also supports `--command` for slash-command execution, `--format json` for
@@ -982,7 +982,7 @@ type MiniCommandInput = {
 export async function runMini(input: MiniCommandInput) {
   if (!RunCommand.handler) throw new Error("Mini command handler is unavailable")
   await RunCommand.handler({
-    $0: "opencode",
+    $0: "hachimicode",
     _: ["mini"],
     message: input.prompt ? [input.prompt] : [],
     command: undefined,

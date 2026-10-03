@@ -448,7 +448,7 @@ for (const input of globalInputs) {
     withGlobalConfig({}, ({ dir }) =>
       Effect.gen(function* () {
         const fs = yield* FSUtil.Service
-        const file = path.join(dir, `opencode${extension}`)
+        const file = path.join(dir, `hachimicode${extension}`)
         yield* fs.writeFileString(file, yield* fs.readFileString(path.join(updateFixtures, input)))
         const patch = ConfigParse.schema(ConfigV1.Info, yield* fs.readJson(`${prefix}-patch.json`), input)
         const updated = yield* Config.use.updateGlobal(patch)
