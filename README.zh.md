@@ -1,128 +1,126 @@
-<p align="center">
-  <a href="https://opencode.ai">
-    <picture>
-      <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="HACHIMI CODE logo">
-    </picture>
-  </a>
-</p>
-<p align="center">开源的 AI Coding Agent。</p>
-<p align="center">
-  <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/opencode-ai"><img alt="npm" src="https://img.shields.io/npm/v/opencode-ai?style=flat-square" /></a>
-  <a href="https://github.com/anomalyco/opencode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/publish.yml?style=flat-square&branch=dev" /></a>
-</p>
+# HACHIMI CODE
 
-<p align="center">
-  <a href="README.md">English</a> |
-  <a href="README.zh.md">简体中文</a> |
-  <a href="README.zht.md">繁體中文</a> |
-  <a href="README.ko.md">한국어</a> |
-  <a href="README.de.md">Deutsch</a> |
-  <a href="README.es.md">Español</a> |
-  <a href="README.fr.md">Français</a> |
-  <a href="README.it.md">Italiano</a> |
-  <a href="README.da.md">Dansk</a> |
-  <a href="README.ja.md">日本語</a> |
-  <a href="README.pl.md">Polski</a> |
-  <a href="README.ru.md">Русский</a> |
-  <a href="README.bs.md">Bosanski</a> |
-  <a href="README.ar.md">العربية</a> |
-  <a href="README.no.md">Norsk</a> |
-  <a href="README.br.md">Português (Brasil)</a> |
-  <a href="README.th.md">ไทย</a> |
-  <a href="README.tr.md">Türkçe</a> |
-  <a href="README.uk.md">Українська</a> |
-  <a href="README.bn.md">বাংলা</a> |
-  <a href="README.gr.md">Ελληνικά</a> |
-  <a href="README.vi.md">Tiếng Việt</a>
-</p>
+[opencode](https://github.com/anomalyco/opencode)（开源的 AI 编码代理）的个人分支，已改造为 **HACHIMI CODE**：橘猫橙黄主题，终端首页有斜向流星雨的动图。
 
-[![HACHIMI CODE Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://opencode.ai)
+本分支**没有发布**到 npm、Homebrew 或任何渠道，因此需要从源码构建运行。它与 opencode 项目无隶属关系，也不是由 opencode 团队构建的。上游是 MIT 许可（见 [LICENSE](./LICENSE)）。
 
----
+## 构建与运行
 
-### 安装
+需要 [Bun](https://bun.sh) 1.3 或更新版本（`packageManager` 固定为 `bun@1.3.14`）。
 
 ```bash
-# 直接安装 (YOLO)
-curl -fsSL https://opencode.ai/install | bash
-
-# 软件包管理器
-npm i -g opencode-ai@latest        # 也可使用 bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS 和 Linux（推荐，始终保持最新）
-brew install opencode              # macOS 和 Linux（官方 brew formula，更新频率较低）
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-bin               # Arch Linux (Latest from AUR)
-mise use -g opencode               # 任意系统
-nix run nixpkgs#opencode           # 或用 github:anomalyco/opencode 获取最新 dev 分支
+bun install
+bun dev            # 在 packages/opencode 目录启动 TUI
+bun dev .          # 在本仓库根目录启动
 ```
 
-> [!TIP]
-> 安装前请先移除 0.1.x 之前的旧版本。
-
-### 桌面应用程序 (BETA)
-
-HACHIMI CODE 也提供桌面版应用。可直接从 [发布页 (releases page)](https://github.com/anomalyco/opencode/releases) 或 [opencode.ai/download](https://opencode.ai/download) 下载。
-
-| 平台                  | 下载文件                           |
-| --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-windows-x64.exe` |
-| Linux                 | `.deb`、`.rpm` 或 AppImage         |
+构建独立可执行文件：
 
 ```bash
-# macOS (Homebrew Cask)
-brew install --cask opencode-desktop
-# Windows (Scoop)
-scoop bucket add extras; scoop install extras/opencode-desktop
+./packages/opencode/script/build.ts --single
+./packages/opencode/dist/opencode-<平台>-<架构>/bin/hachimicode
 ```
 
-#### 安装目录
+产物二进制名为 `hachimicode`（目录名形如 `opencode-darwin-arm64`）。
 
-安装脚本按照以下优先级决定安装路径：
+## 命令
 
-1. `$HACHIMICODE_INSTALL_DIR` - 自定义安装目录
-2. `$XDG_BIN_DIR` - 符合 XDG 基础目录规范的路径
-3. `$HOME/bin` - 如果存在或可创建的用户二进制目录
-4. `$HOME/.hachimicode/bin` - 默认备用路径
+CLI 名为 `hachimicode`，不带子命令直接运行即进入 TUI。
+
+| 命令 | 作用 |
+| --- | --- |
+| `hachimicode [project]` | 启动终端界面（默认） |
+| `hachimicode run [message..]` | 非交互执行一条提示词 |
+| `hachimicode serve` | 启动无界面服务端 |
+| `hachimicode web` | 启动服务端并打开 Web 界面 |
+| `hachimicode attach <url>` | 把 TUI 连接到已运行的服务端 |
+| `hachimicode models [provider]` | 列出可用模型 |
+| `hachimicode providers` | 管理各家凭证（别名 `auth`） |
+| `hachimicode agent` | 管理 agent |
+| `hachimicode session` | 管理会话 |
+| `hachimicode mcp` | 管理 MCP 服务器 |
+| `hachimicode plugin <module>` | 安装插件并写入配置（别名 `plug`） |
+| `hachimicode stats` | token 与花费统计 |
+| `hachimicode export` / `import` | 以 JSON 导入导出会话 |
+| `hachimicode github` / `pr` | GitHub agent 与 PR |
+| `hachimicode debug` | 诊断工具 |
+| `hachimicode db` | 数据库工具 |
+| `hachimicode upgrade` / `uninstall` | 自升级与卸载 |
+| `hachimicode completion` | 生成 shell 补全脚本 |
+| `hachimicode acp` | ACP（Agent Client Protocol）服务端 |
+
+每个命令都可以用 `--help` 查看参数，例如 `hachimicode run --help`。
+
+## 配置文件位置与名称
+
+配置为 JSON 或 JSONC。全局配置放在配置目录，项目配置放在从工作目录向上查找的 `.hachimicode` 目录里。
+
+| 内容 | 位置 |
+| --- | --- |
+| 全局配置 | `~/.config/hachimicode/hachimicode.json` 或 `.jsonc`（遵循 `$XDG_CONFIG_HOME`） |
+| 项目配置 | `<项目>/.hachimicode/hachimicode.json` 或 `.jsonc`，父目录同样会被查找 |
+| TUI 设置 | 上述任一目录下的 `tui.json`，例如 `~/.config/hachimicode/tui.json` |
+| 主题 | 上述任一目录下的 `themes/<名称>.json`，用 TUI 的 `theme` 设置选择 |
+| Agents | `{agent,agents}/**/*.md` |
+| 命令 | `{command,commands}/**/*.md` |
+| Modes | `{mode,modes}/*.md` |
+| 插件 | `{plugin,plugins}/*.{ts,js}` |
+| 自定义工具 | `{tool,tools}/*.{js,ts}` |
+| 技能 | `skills/` 下的 `*.md` 或 `**/SKILL.md` |
+
+配置目录之外的数据与状态：
+
+| 内容 | 位置 |
+| --- | --- |
+| 数据 | `~/.local/share/hachimicode` —— 会话在 `hachimicode-local.db`，凭证在 `auth.json`，日志在 `log/` |
+| 缓存 | `~/.cache/hachimicode` |
+| 状态 | `~/.local/state/hachimicode` |
+
+环境变量统一使用 `HACHIMICODE_` 前缀，例如 `HACHIMICODE_CONFIG`、`HACHIMICODE_CONFIG_DIR`、`HACHIMICODE_CONFIG_CONTENT`、`HACHIMICODE_DB`、`HACHIMICODE_DISABLE_PROJECT_CONFIG`、`HACHIMICODE_SERVER_PASSWORD`、`HACHIMICODE_SERVER_USERNAME`。
+
+## Agent
+
+内置两个 agent，用 `Tab` 切换：
+
+- **build** —— 默认的完全权限 agent
+- **plan** —— 只读分析，默认拒绝编辑、执行 shell 命令前先询问
+
+另有一个 **general** 子 agent 处理复杂检索与多步任务，在消息中用 `@general` 调用。
+
+## 开发
 
 ```bash
-# 示例
-HACHIMICODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/install | bash
+bun install
+bun lint                              # oxlint
+bun typecheck                         # 经 turbo 检查全部包
+cd packages/opencode && bun typecheck # 或单包检查：不要直接调用 tsc
 ```
 
-### Agents
+测试必须**在包目录内**运行，不能在仓库根运行：
 
-HACHIMI CODE 内置两种 Agent，可用 `Tab` 键快速切换：
+```bash
+cd packages/opencode && bun test
+```
 
-- **build** - 默认模式，具备完整权限，适合开发工作
-- **plan** - 只读模式，适合代码分析与探索
-  - 默认拒绝修改文件
-  - 运行 bash 命令前会询问
-  - 便于探索未知代码库或规划改动
+改动公共 `HttpApi` 后需要重新生成客户端，生成文件不要手改：
 
-另外还包含一个 **general** 子 Agent，用于复杂搜索和多步任务，内部使用，也可在消息中输入 `@general` 调用。
+```bash
+cd packages/client && bun run generate
+```
 
-了解更多 [Agents](https://opencode.ai/docs/agents) 相关信息。
+首页动图与字标都是**生成**的，不是手画的。动图由一组 GIF/PNG 烘焙而来，字标由点阵字体生成：
 
-### 文档
+```bash
+python3 script/build-home-memes.py --out packages/tui/src/component/home-memes/memes.json \
+  --width 20 --height 24 --max-frames 16 smn1.gif smn2.gif dg.png
+python3 script/build-wordmark.py --height 14 --gap 3
+```
 
-更多配置说明请查看我们的 [**官方文档**](https://opencode.ai/docs)。
+## 本分支的取舍
 
-### 参与贡献
+改造一个分支从来不是纯粹的字符串替换。以下刻意保留上游名称，因为改名会直接弄坏可用性：
 
-如有兴趣贡献代码，请在提交 PR 前阅读 [贡献指南 (Contributing Docs)](./CONTRIBUTING.md)。
-
-### 基于 HACHIMI CODE 进行开发
-
-如果你在项目名中使用了 “opencode”（如 “opencode-dashboard” 或 “opencode-mobile”），请在 README 里注明该项目不是 HACHIMI CODE 团队官方开发，且不存在隶属关系。
-
----
-
-**加入我们的社区** [飞书](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=52ao9352-5623-4fa0-b7dd-3407c392c1af&qr_code=true) | [X.com](https://x.com/opencode)
+- 托管 provider id `opencode`、`opencode-go`，以及 `opencode.ai` 服务端点
+- `x-opencode-*` 这套 HTTP 头 —— `packages/app/vendor` 里固定的预编译客户端就是按这些头名通信的
+- provider 的 `referrer` / `originator` 字段 —— OAuth 流程依赖它们
+- `.git/opencode` 项目标识文件 —— 它把已有仓库和它们的会话关联在一起

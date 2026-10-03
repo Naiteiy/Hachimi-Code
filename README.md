@@ -1,129 +1,126 @@
-<p align="center">
-  <a href="https://opencode.ai">
-    <picture>
-      <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="HACHIMI CODE logo">
-    </picture>
-  </a>
-</p>
-<p align="center">The open source AI coding agent.</p>
-<p align="center">
-  <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/opencode-ai"><img alt="npm" src="https://img.shields.io/npm/v/opencode-ai?style=flat-square" /></a>
-  <a href="https://github.com/anomalyco/opencode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/publish.yml?style=flat-square&branch=dev" /></a>
-</p>
+# HACHIMI CODE
 
-<p align="center">
-  <a href="README.md">English</a> |
-  <a href="README.zh.md">简体中文</a> |
-  <a href="README.zht.md">繁體中文</a> |
-  <a href="README.ko.md">한국어</a> |
-  <a href="README.de.md">Deutsch</a> |
-  <a href="README.es.md">Español</a> |
-  <a href="README.fr.md">Français</a> |
-  <a href="README.it.md">Italiano</a> |
-  <a href="README.da.md">Dansk</a> |
-  <a href="README.ja.md">日本語</a> |
-  <a href="README.pl.md">Polski</a> |
-  <a href="README.ru.md">Русский</a> |
-  <a href="README.bs.md">Bosanski</a> |
-  <a href="README.ar.md">العربية</a> |
-  <a href="README.no.md">Norsk</a> |
-  <a href="README.br.md">Português (Brasil)</a> |
-  <a href="README.th.md">ไทย</a> |
-  <a href="README.tr.md">Türkçe</a> |
-  <a href="README.uk.md">Українська</a> |
-  <a href="README.bn.md">বাংলা</a> |
-  <a href="README.gr.md">Ελληνικά</a> |
-  <a href="README.vi.md">Tiếng Việt</a>
-</p>
+A personal fork of [opencode](https://github.com/anomalyco/opencode) — the open source AI coding agent — rebranded as **HACHIMI CODE**, with a warm orange-cat theme and a slanted meme shower on the terminal home screen.
 
-[![HACHIMI CODE Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://opencode.ai)
+This fork is **not published** to npm, Homebrew, or any other channel, so it is built and run from source. It is unaffiliated with the opencode project and is not built by its team. Upstream is MIT licensed (see [LICENSE](./LICENSE)).
 
----
+## Build and run
 
-### Installation
+Requires [Bun](https://bun.sh) 1.3 or newer (`packageManager` pins `bun@1.3.14`).
 
 ```bash
-# YOLO
-curl -fsSL https://opencode.ai/install | bash
-
-# Package managers
-npm i -g opencode-ai@latest        # or bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS and Linux (recommended, always up to date)
-brew install opencode              # macOS and Linux (official brew formula, updated less)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-bin               # Arch Linux (Latest from AUR)
-mise use -g opencode               # Any OS
-nix run nixpkgs#opencode           # or github:anomalyco/opencode for latest dev branch
+bun install
+bun dev            # starts the TUI against packages/opencode
+bun dev .          # starts it against this repository
 ```
 
-> [!TIP]
-> Remove versions older than 0.1.x before installing.
-
-### Desktop App (BETA)
-
-HACHIMI CODE is also available as a desktop application. Download directly from the [releases page](https://github.com/anomalyco/opencode/releases) or [opencode.ai/download](https://opencode.ai/download).
-
-| Platform              | Download                           |
-| --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-windows-x64.exe` |
-| Linux                 | `.deb`, `.rpm`, or `.AppImage`     |
+A standalone binary:
 
 ```bash
-# macOS (Homebrew)
-brew install --cask opencode-desktop
-# Windows (Scoop)
-scoop bucket add extras; scoop install extras/opencode-desktop
+./packages/opencode/script/build.ts --single
+./packages/opencode/dist/opencode-<platform>-<arch>/bin/hachimicode
 ```
 
-#### Installation Directory
+The built executable is named `hachimicode` (for example `opencode-darwin-arm64` for the directory, `hachimicode` for the binary).
 
-The install script respects the following priority order for the installation path:
+## Commands
 
-1. `$HACHIMICODE_INSTALL_DIR` - Custom installation directory
-2. `$XDG_BIN_DIR` - XDG Base Directory Specification compliant path
-3. `$HOME/bin` - Standard user binary directory (if it exists or can be created)
-4. `$HOME/.hachimicode/bin` - Default fallback
+The CLI is `hachimicode`. Running it with no command starts the TUI.
+
+| Command | What it does |
+| --- | --- |
+| `hachimicode [project]` | start the terminal UI (default) |
+| `hachimicode run [message..]` | run one prompt non-interactively |
+| `hachimicode serve` | start a headless server |
+| `hachimicode web` | start a server and open the web interface |
+| `hachimicode attach <url>` | attach the TUI to a running server |
+| `hachimicode models [provider]` | list available models |
+| `hachimicode providers` | manage provider credentials (alias `auth`) |
+| `hachimicode agent` | manage agents |
+| `hachimicode session` | manage sessions |
+| `hachimicode mcp` | manage MCP servers |
+| `hachimicode plugin <module>` | install a plugin and update config (alias `plug`) |
+| `hachimicode stats` | token and cost statistics |
+| `hachimicode export` / `import` | move session data as JSON |
+| `hachimicode github` / `pr` | GitHub agent and pull requests |
+| `hachimicode debug` | diagnostics |
+| `hachimicode db` | database tools |
+| `hachimicode upgrade` / `uninstall` | self management |
+| `hachimicode completion` | shell completion script |
+| `hachimicode acp` | ACP (Agent Client Protocol) server |
+
+Every command prints its options with `--help`, for example `hachimicode run --help`.
+
+## Configuration
+
+Configuration is JSON or JSONC. Global settings live in the config directory, project settings in a `.hachimicode` directory discovered by walking up from the working directory.
+
+| What | Where |
+| --- | --- |
+| Global config | `~/.config/hachimicode/hachimicode.json` or `.jsonc` (`$XDG_CONFIG_HOME` respected) |
+| Project config | `<project>/.hachimicode/hachimicode.json` or `.jsonc`, also searched in parent directories |
+| TUI settings | `tui.json` in either location, for example `~/.config/hachimicode/tui.json` |
+| Themes | `themes/<name>.json` in either location; pick one with the TUI `theme` setting |
+| Agents | `{agent,agents}/**/*.md` |
+| Commands | `{command,commands}/**/*.md` |
+| Modes | `{mode,modes}/*.md` |
+| Plugins | `{plugin,plugins}/*.{ts,js}` |
+| Custom tools | `{tool,tools}/*.{js,ts}` |
+| Skills | `skills/`, as `*.md` or `**/SKILL.md` |
+
+Data and state, outside the config directories:
+
+| What | Where |
+| --- | --- |
+| Data | `~/.local/share/hachimicode` — sessions in `hachimicode-local.db`, provider credentials in `auth.json`, logs in `log/` |
+| Cache | `~/.cache/hachimicode` |
+| State | `~/.local/state/hachimicode` |
+
+Environment variables use the `HACHIMICODE_` prefix, for example `HACHIMICODE_CONFIG`, `HACHIMICODE_CONFIG_DIR`, `HACHIMICODE_CONFIG_CONTENT`, `HACHIMICODE_DB`, `HACHIMICODE_DISABLE_PROJECT_CONFIG`, `HACHIMICODE_SERVER_PASSWORD`, and `HACHIMICODE_SERVER_USERNAME`.
+
+## Agents
+
+Two built-in agents, switched with `Tab`:
+
+- **build** — the default full-access agent
+- **plan** — read-only analysis; it denies edits and asks before running shell commands
+
+A **general** subagent handles complex searches and multi-step work, invoked with `@general` in a message.
+
+## Development
 
 ```bash
-# Examples
-HACHIMICODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/install | bash
+bun install
+bun lint                              # oxlint
+bun typecheck                         # all packages, via turbo
+cd packages/opencode && bun typecheck # or a single package: never call tsc directly
 ```
 
-### Agents
+Tests are run from a package directory, not the repository root:
 
-HACHIMI CODE includes two built-in agents you can switch between with the `Tab` key.
+```bash
+cd packages/opencode && bun test
+```
 
-- **build** - Default, full-access agent for development work
-- **plan** - Read-only agent for analysis and code exploration
-  - Denies file edits by default
-  - Asks permission before running bash commands
-  - Ideal for exploring unfamiliar codebases or planning changes
+Changing the public `HttpApi` means regenerating the client, and generated files are never edited by hand:
 
-Also included is a **general** subagent for complex searches and multistep tasks.
-This is used internally and can be invoked using `@general` in messages.
+```bash
+cd packages/client && bun run generate
+```
 
-Learn more about [agents](https://opencode.ai/docs/agents).
+The home-screen sprites and the wordmark are generated, not hand-drawn. Rebuild the sprites from a folder of GIF or PNG files, and the wordmark from its dot-matrix font:
 
-### Documentation
+```bash
+python3 script/build-home-memes.py --out packages/tui/src/component/home-memes/memes.json \
+  --width 20 --height 24 --max-frames 16 smn1.gif smn2.gif dg.png
+python3 script/build-wordmark.py --height 14 --gap 3
+```
 
-For more info on how to configure HACHIMI CODE, [**head over to our docs**](https://opencode.ai/docs).
+## Fork notes
 
-### Contributing
+Renaming a fork is never a pure string substitution. These keep their upstream names on purpose, because renaming them breaks working integrations:
 
-If you're interested in contributing to HACHIMI CODE, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
-
-### Building on HACHIMI CODE
-
-If you are working on a project that's related to HACHIMI CODE and is using "opencode" as part of its name, for example "opencode-dashboard" or "opencode-mobile", please add a note to your README to clarify that it is not built by the HACHIMI CODE team and is not affiliated with us in any way.
-
----
-
-**Join our community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
+- the hosted provider ids `opencode` and `opencode-go`, and the `opencode.ai` service endpoints
+- the `x-opencode-*` HTTP headers, which the pinned prebuilt client artifact in `packages/app/vendor` speaks
+- the provider `referrer` and `originator` fields that OAuth flows depend on
+- the `.git/opencode` project identifier file, which ties existing repositories to their sessions
