@@ -1,0 +1,91 @@
+name: Release
+
+# Publishing happens when you push a version tag, for example:
+#
+#   git tag v0.1.0
+#   git push origin v0.1.0
+#
+# You can also run it by hand from the Actions tab, where you type the name of a
+# tag that already exists. Each run builds the standalone binary on a native
+# runner and attaches it to a GitHub Release, so anyone can download a runnable
+# build without installing Bun.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to publish as a release
+        required: true
+
+permissions:
+  # Needed to create the release and upload its assets.
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Building on the platform itself keeps every native dependency
+          # (node-pty, watcher binaries) correct for that platform.
+          - runner: ubuntu-latest
+            target: linux-x64
+          - runner: macos-latest
+            target: darwin-arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build the standalone binary
+        run: bun run script/build.ts --single
+        working-directory: packages/opencode
+
+      # The build writes dist/<package>-<os>-<arch>/, so the archive is named
+      # after the platform rather than the package.
+      - name: Package the build
+        run: |
+          tar -czf "hachimicode-${{ matrix.target }}.tar.gz" \
+            -C "packages/opencode/dist/hachimicode-${{ matrix.target }}" .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hachimicode-${{ matrix.target }}
+          path: hachimicode-${{ matrix.target }}.tar.gz
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: download
+          merge-multiple: true
+
+      - name: Compute the tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: echo "name=${INPUT_TAG:-${GITHUB_REF_NAME}}" >> "$GITHUB_OUTPUT"
+
+      - name: Create the release with its assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.name }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh release create "$TAG" \
+            --repo "$REPO" \
+            --title "$TAG" \
+            --generate-notes \
+            download/*.tar.gz

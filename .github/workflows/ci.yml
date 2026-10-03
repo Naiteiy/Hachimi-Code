@@ -1,0 +1,40 @@
+name: CI
+
+# Runs on every push to hachimi_dev, on pull requests, and on demand from the
+# Actions tab. Nothing here needs a secret: it only installs and verifies.
+on:
+  push:
+    branches: [hachimi_dev]
+  pull_request:
+  workflow_dispatch:
+
+# A new push cancels the previous run of the same branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          # Matches the packageManager field in the root package.json.
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Typecheck every package
+        run: bun typecheck
+
+      - name: Test the terminal UI
+        run: bun test
+        working-directory: packages/tui
+
+      - name: Test the core runtime
+        run: bun test
+        working-directory: packages/core

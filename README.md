@@ -1,114 +1,157 @@
 # HACHIMI CODE
 
-A personal fork of [opencode](https://github.com/anomalyco/opencode) — the open source AI coding agent — rebranded as **HACHIMI CODE**, with a warm orange-cat theme and a slanted meme shower on the terminal home screen.
+[opencode](https://github.com/anomalyco/opencode)（开源的 AI 编码代理）的个人分支，已改造为 **HACHIMI CODE**：橘猫橙黄主题，终端首页有斜向流星雨的动图。
 
-This fork is **not published** to npm, Homebrew, or any other channel, so it is built and run from source. It is unaffiliated with the opencode project and is not built by its team. Upstream is MIT licensed (see [LICENSE](./LICENSE)).
+本分支**没有发布到 npm、Homebrew 或任何渠道**，所以要么直接下载 Releases 里的可执行文件，要么从源码构建。它与 opencode 项目无隶属关系，也不是由 opencode 团队构建的。上游为 MIT 许可（见 [LICENSE](./LICENSE)）。
 
-## Build and run
+> 本仓库的工作分支是 `hachimi_dev`，`dev` 等其它分支保持上游原样。
 
-Requires [Bun](https://bun.sh) 1.3 or newer (`packageManager` pins `bun@1.3.14`).
+## 下载与安装
+
+从 [Releases 页面](https://github.com/Naiteiy/Hachimi-Code/releases) 下载对应平台的压缩包，解压后直接运行：
+
+```bash
+tar -xzf hachimicode-darwin-arm64.tar.gz
+./bin/hachimicode            # 直接进入终端界面
+```
+
+| 平台 | 压缩包 |
+| --- | --- |
+| macOS（Apple 芯片） | `hachimicode-darwin-arm64.tar.gz` |
+| Linux（x64） | `hachimicode-linux-x64.tar.gz` |
+
+macOS 从网上下载的二进制会被系统加上隔离标记，如果提示"无法验证开发者"，执行一次即可：
+
+```bash
+xattr -d com.apple.quarantine ./bin/hachimicode
+```
+
+## 从源码构建
+
+需要 [Bun](https://bun.sh) 1.3 或更新版本（根目录 `packageManager` 固定为 `bun@1.3.14`）。
 
 ```bash
 bun install
-bun dev            # starts the TUI against packages/opencode
-bun dev .          # starts it against this repository
+bun dev            # 在 packages/opencode 目录启动 TUI
+bun dev .          # 在本仓库根目录启动
 ```
 
-A standalone binary:
+构建独立可执行文件（只构建当前平台）：
 
 ```bash
-./packages/opencode/script/build.ts --single
-./packages/opencode/dist/opencode-<platform>-<arch>/bin/hachimicode
+cd packages/opencode
+bun run script/build.ts --single
+# 产物：dist/hachimicode-darwin-arm64/bin/hachimicode
 ```
 
-The built executable is named `hachimicode` (for example `opencode-darwin-arm64` for the directory, `hachimicode` for the binary).
+目录名是 `<包名>-<平台>-<架构>`，包名已改为 `hachimicode`，脚本结束时会自动做一次冒烟测试。
 
-## Commands
+## 命令
 
-The CLI is `hachimicode`. Running it with no command starts the TUI.
+CLI 名为 `hachimicode`，不带子命令直接运行即进入 TUI。
 
-| Command | What it does |
+| 命令 | 作用 |
 | --- | --- |
-| `hachimicode [project]` | start the terminal UI (default) |
-| `hachimicode run [message..]` | run one prompt non-interactively |
-| `hachimicode serve` | start a headless server |
-| `hachimicode web` | start a server and open the web interface |
-| `hachimicode attach <url>` | attach the TUI to a running server |
-| `hachimicode models [provider]` | list available models |
-| `hachimicode providers` | manage provider credentials (alias `auth`) |
-| `hachimicode agent` | manage agents |
-| `hachimicode session` | manage sessions |
-| `hachimicode mcp` | manage MCP servers |
-| `hachimicode plugin <module>` | install a plugin and update config (alias `plug`) |
-| `hachimicode stats` | token and cost statistics |
-| `hachimicode export` / `import` | move session data as JSON |
-| `hachimicode github` / `pr` | GitHub agent and pull requests |
-| `hachimicode debug` | diagnostics |
-| `hachimicode db` | database tools |
-| `hachimicode upgrade` / `uninstall` | self management |
-| `hachimicode completion` | shell completion script |
-| `hachimicode acp` | ACP (Agent Client Protocol) server |
+| `hachimicode [project]` | 启动终端界面（默认） |
+| `hachimicode run [message..]` | 非交互执行一条提示词 |
+| `hachimicode serve` | 启动无界面服务端 |
+| `hachimicode web` | 启动服务端并打开 Web 界面 |
+| `hachimicode attach <url>` | 把 TUI 连接到已运行的服务端 |
+| `hachimicode models [provider]` | 列出可用模型 |
+| `hachimicode providers` | 管理各家凭证（别名 `auth`） |
+| `hachimicode agent` | 管理 agent |
+| `hachimicode session` | 管理会话 |
+| `hachimicode mcp` | 管理 MCP 服务器 |
+| `hachimicode plugin <module>` | 安装插件并写入配置（别名 `plug`） |
+| `hachimicode stats` | token 与花费统计 |
+| `hachimicode export` / `import` | 以 JSON 导入导出会话 |
+| `hachimicode github` / `pr` | GitHub agent 与 PR |
+| `hachimicode debug` | 诊断工具 |
+| `hachimicode db` | 数据库工具 |
+| `hachimicode upgrade` / `uninstall` | 自升级与卸载 |
+| `hachimicode completion` | 生成 shell 补全脚本 |
+| `hachimicode acp` | ACP（Agent Client Protocol）服务端 |
 
-Every command prints its options with `--help`, for example `hachimicode run --help`.
+每个命令都可以用 `--help` 查看参数，例如 `hachimicode run --help`。
 
-## Configuration
+## 配置文件位置与名称
 
-Configuration is JSON or JSONC. Global settings live in the config directory, project settings in a `.hachimicode` directory discovered by walking up from the working directory.
+配置为 JSON 或 JSONC。全局配置放在配置目录，项目配置放在从工作目录向上查找的 `.hachimicode` 目录里。
 
-| What | Where |
+| 内容 | 位置 |
 | --- | --- |
-| Global config | `~/.config/hachimicode/hachimicode.json` or `.jsonc` (`$XDG_CONFIG_HOME` respected) |
-| Project config | `<project>/.hachimicode/hachimicode.json` or `.jsonc`, also searched in parent directories |
-| TUI settings | `tui.json` in either location, for example `~/.config/hachimicode/tui.json` |
-| Themes | `themes/<name>.json` in either location; pick one with the TUI `theme` setting |
+| 全局配置 | `~/.config/hachimicode/hachimicode.json` 或 `.jsonc`（遵循 `$XDG_CONFIG_HOME`） |
+| 项目配置 | `<项目>/.hachimicode/hachimicode.json` 或 `.jsonc`，父目录同样会被查找 |
+| TUI 设置 | 上述任一目录下的 `tui.json`，例如 `~/.config/hachimicode/tui.json` |
+| 主题 | 上述任一目录下的 `themes/<名称>.json`，用 TUI 的 `theme` 设置选择 |
 | Agents | `{agent,agents}/**/*.md` |
-| Commands | `{command,commands}/**/*.md` |
+| 命令 | `{command,commands}/**/*.md` |
 | Modes | `{mode,modes}/*.md` |
-| Plugins | `{plugin,plugins}/*.{ts,js}` |
-| Custom tools | `{tool,tools}/*.{js,ts}` |
-| Skills | `skills/`, as `*.md` or `**/SKILL.md` |
+| 插件 | `{plugin,plugins}/*.{ts,js}` |
+| 自定义工具 | `{tool,tools}/*.{js,ts}` |
+| 技能 | `skills/` 下的 `*.md` 或 `**/SKILL.md` |
 
-Data and state, outside the config directories:
+配置目录之外的数据与状态：
 
-| What | Where |
+| 内容 | 位置 |
 | --- | --- |
-| Data | `~/.local/share/hachimicode` — sessions in `hachimicode-local.db`, provider credentials in `auth.json`, logs in `log/` |
-| Cache | `~/.cache/hachimicode` |
-| State | `~/.local/state/hachimicode` |
+| 数据 | `~/.local/share/hachimicode` —— 会话在 `hachimicode-local.db`，凭证在 `auth.json`，日志在 `log/` |
+| 缓存 | `~/.cache/hachimicode` |
+| 状态 | `~/.local/state/hachimicode` |
 
-Environment variables use the `HACHIMICODE_` prefix, for example `HACHIMICODE_CONFIG`, `HACHIMICODE_CONFIG_DIR`, `HACHIMICODE_CONFIG_CONTENT`, `HACHIMICODE_DB`, `HACHIMICODE_DISABLE_PROJECT_CONFIG`, `HACHIMICODE_SERVER_PASSWORD`, and `HACHIMICODE_SERVER_USERNAME`.
+环境变量统一使用 `HACHIMICODE_` 前缀，例如 `HACHIMICODE_CONFIG`、`HACHIMICODE_CONFIG_DIR`、`HACHIMICODE_CONFIG_CONTENT`、`HACHIMICODE_DB`、`HACHIMICODE_DISABLE_PROJECT_CONFIG`、`HACHIMICODE_SERVER_PASSWORD`、`HACHIMICODE_SERVER_USERNAME`。
 
-## Agents
+## Agent
 
-Two built-in agents, switched with `Tab`:
+内置两个 agent，用 `Tab` 切换：
 
-- **build** — the default full-access agent
-- **plan** — read-only analysis; it denies edits and asks before running shell commands
+- **build** —— 默认的完全权限 agent
+- **plan** —— 只读分析，默认拒绝编辑、执行 shell 命令前先询问
 
-A **general** subagent handles complex searches and multi-step work, invoked with `@general` in a message.
+另有一个 **general** 子 agent 处理复杂检索与多步任务，在消息中用 `@general` 调用。
 
-## Development
+## 流水线与发版
+
+流水线就是 `.github/workflows/` 下的两个文件，GitHub 会自动执行：
+
+| 文件 | 触发条件 | 作用 |
+| --- | --- | --- |
+| `ci.yml` | 推送到 `hachimi_dev`、开 PR、或手动 | 装依赖 → 全仓类型检查 → 跑 TUI 与 core 的测试。不需要任何密钥 |
+| `release.yml` | 推送 `v*` 形式的 tag，或手动 | 在 Linux 与 macOS 上各构建一次二进制，打包后创建 GitHub Release 并附上压缩包 |
+
+**发一个版本**只需两步：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+推送 tag 后，去仓库的 Actions 标签页就能看到进度，跑完在 Releases 页面就有可下载的压缩包。也可以手动触发（Actions → Release → Run workflow），填入一个已存在的 tag 名称。
+
+上游原有的 27 个流水线已在本分支删除：它们面向上游组织，依赖约 30 个上游密钥，还会反向提交并推送。
+
+## 开发
 
 ```bash
 bun install
 bun lint                              # oxlint
-bun typecheck                         # all packages, via turbo
-cd packages/opencode && bun typecheck # or a single package: never call tsc directly
+bun typecheck                         # 经 turbo 检查全部包
+cd packages/opencode && bun typecheck # 或单包检查：不要直接调用 tsc
 ```
 
-Tests are run from a package directory, not the repository root:
+测试必须**在包目录内**运行，不能在仓库根运行：
 
 ```bash
 cd packages/opencode && bun test
 ```
 
-Changing the public `HttpApi` means regenerating the client, and generated files are never edited by hand:
+改动公共 `HttpApi` 后需要重新生成客户端，生成文件不要手改：
 
 ```bash
 cd packages/client && bun run generate
 ```
 
-The home-screen sprites and the wordmark are generated, not hand-drawn. Rebuild the sprites from a folder of GIF or PNG files, and the wordmark from its dot-matrix font:
+首页动图与字标都是**生成**的，不是手画的。动图由一组 GIF/PNG 烘焙而来，字标由点阵字体生成：
 
 ```bash
 python3 script/build-home-memes.py --out packages/tui/src/component/home-memes/memes.json \
@@ -116,11 +159,11 @@ python3 script/build-home-memes.py --out packages/tui/src/component/home-memes/m
 python3 script/build-wordmark.py --height 14 --gap 3
 ```
 
-## Fork notes
+## 本分支的取舍
 
-Renaming a fork is never a pure string substitution. These keep their upstream names on purpose, because renaming them breaks working integrations:
+改造一个分支从来不是纯粹的字符串替换。以下刻意保留上游名称，因为改名会直接弄坏可用性：
 
-- the hosted provider ids `opencode` and `opencode-go`, and the `opencode.ai` service endpoints
-- the `x-opencode-*` HTTP headers, which the pinned prebuilt client artifact in `packages/app/vendor` speaks
-- the provider `referrer` and `originator` fields that OAuth flows depend on
-- the `.git/opencode` project identifier file, which ties existing repositories to their sessions
+- 托管 provider id `opencode`、`opencode-go`，以及 `opencode.ai` 服务端点
+- `x-opencode-*` 这套 HTTP 头 —— `packages/app/vendor` 里固定的预编译客户端就是按这些头名通信的
+- provider 的 `referrer` / `originator` 字段 —— OAuth 流程依赖它们
+- `.git/opencode` 项目标识文件 —— 它把已有仓库和它们的会话关联在一起
